@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         微邦答题助手
 // @namespace    https://greasyfork.org/zh-CN/users/563657-seast19
-// @version      1.2
+// @version      1.2.1
 // @description  微邦自动匹配答案脚本，解放你的大脑
 // @icon         https://s1.ax1x.com/2020/05/18/YWucdO.png
 // @author       seast19
@@ -85,9 +85,10 @@
       },
       url: 'https://lc-api.seast.net' + '/1.1/classes/wb_feedback',
       data: JSON.stringify({
-        msg: e.msg,
-        question: e.q,
-        ans: e.a,
+        src: window.location.href || '',
+        msg: e.msg || '',
+        question: e.q || '',
+        ans: e.a || '',
       }),
     })
   }
@@ -143,8 +144,6 @@
           if (answerList.length != quesionsList.length) {
             feedBack({
               msg: '后台与前端题目数不匹配',
-              q: '',
-              a: '',
             })
           }
 
