@@ -238,23 +238,71 @@
         `答案已生成，共[${answerList.length}/${quesionsList.length}]题，请按F12查看`
       )
 
-      let fatherNode = obj.NodeFather()
-
-      for (let i = 0; i < answerList.length; i++) {
-        // 查找题号
-        for (const subNode of fatherNode) {
+      // 便历服务器返回的题目列表
+      for (const answer of answerList) {
+        // 便历网页中的题目以找到匹配的题目
+        for (const subNode of obj.NodeFather()) {
+          // 查找题号
           let num = obj.TextNum(subNode)
           let ques = obj.TextQuestion(subNode)
+          // 匹配题目
+          if (ques === filteSpecialSymbol(answer.q)) {
+            let tempAns = ''
+            let ansNodes = obj.NodeAnsFather(subNode)
+            // 反向匹配答案的序号，防止选项与答案不一致
+            for (let i = 0; i < ansNodes.length; i++) {
+              // 当前选项的文本在正确答案中则将其序号记录
+              if (answer.a.indexOf(obj.TextOpt(ansNodes[i])) != -1) {
+                switch (i) {
+                  case 0:
+                    tempAns += 'A'
+                    break
+                  case 1:
+                    tempAns += 'B'
+                    break
+                  case 2:
+                    tempAns += 'C'
+                    break
+                  case 3:
+                    tempAns += 'D'
+                    break
+                  case 4:
+                    tempAns += 'E'
+                    break
+                  case 5:
+                    tempAns += 'F'
+                    break
 
-          if (ques === filteSpecialSymbol(answerList[i].q)) {
+                  default:
+                    break
+                }
+              }
+            }
             console.log(
-              `[${answerList[i].opt}] [第${num}题] (${answerList[i].a}) --> 题目：${answerList[i].q}`
+              `[${tempAns}] [第${num}题] (${answer.a}) --> 题目：${answer.q}`
             )
             break
           }
         }
-        allList.push(answerList[i].q)
+        allList.push(answer.q)
       }
+
+      // for (let i = 0; i < answerList.length; i++) {
+      //   // 查找题号
+      //   for (const subNode of fatherNode) {
+      //     let num = obj.TextNum(subNode)
+      //     let ques = obj.TextQuestion(subNode)
+
+      //     if (ques === filteSpecialSymbol(answerList[i].q)) {
+      //       console.log(
+      //         `[${answerList[i].opt}] [第${num}题] (${answerList[i].a}) --> 题目：${answerList[i].q}`
+      //       )
+      //       break
+      //     }
+      //   }
+      //   allList.push(answerList[i].q)
+      // }
+
       console.log('*******************')
 
       resolve()
