@@ -1,18 +1,14 @@
 // ==UserScript==
 // @name         微邦答题助手
 // @namespace    https://greasyfork.org/zh-CN/users/563657-seast19
-// @version      1.2.1
 // @description  微邦自动匹配答案脚本，解放你的大脑
-// @icon         https://s1.ax1x.com/2020/05/18/YWucdO.png
+// @version      1.2.2
 // @author       seast19
+// @icon         https://s1.ax1x.com/2020/05/18/YWucdO.png
 // @match        https://weibang.youth.cn/webpage_sapi/examination/detail/*/showDetail/0/phone/platform/*/orgId/httphost/httpport/token
 // @match        https://www.nnjjtgs.com/user/nnjexamExercises/paper.html?testactivityId=*
 // @match        https://www.nnjjtgs.com/user/nnjexam/paper.html?tpid=*
 // @grant        GM_xmlhttpRequest
-// @note         2020/05/30 1.2 优化代码结构，添加对众学网支持
-// @note         2020/05/28 1.0 修复多选题重复点击生成答案时会取消选中的情况
-// @note         2020/05/26 0.7 修复多选题选项中有重复的答案选项导致无法全部选中的问题
-// @note         2020/05/25 0.6 修复因空白字符引起的答案不匹配问题
 
 // ==/UserScript==
 ;(function () {
@@ -252,7 +248,10 @@
             // 反向匹配答案的序号，防止选项与答案不一致
             for (let i = 0; i < ansNodes.length; i++) {
               // 当前选项的文本在正确答案中则将其序号记录
-              if (answer.a.indexOf(obj.TextOpt(ansNodes[i])) != -1) {
+              let ansList = answer.a.map((e) => {
+                return filteSpecialSymbol(e)
+              })
+              if (ansList.indexOf(obj.TextOpt(ansNodes[i])) != -1) {
                 switch (i) {
                   case 0:
                     tempAns += 'A'
@@ -286,22 +285,6 @@
         }
         allList.push(answer.q)
       }
-
-      // for (let i = 0; i < answerList.length; i++) {
-      //   // 查找题号
-      //   for (const subNode of fatherNode) {
-      //     let num = obj.TextNum(subNode)
-      //     let ques = obj.TextQuestion(subNode)
-
-      //     if (ques === filteSpecialSymbol(answerList[i].q)) {
-      //       console.log(
-      //         `[${answerList[i].opt}] [第${num}题] (${answerList[i].a}) --> 题目：${answerList[i].q}`
-      //       )
-      //       break
-      //     }
-      //   }
-      //   allList.push(answerList[i].q)
-      // }
 
       console.log('*******************')
 
@@ -433,37 +416,41 @@
 
   // *********************初始化***********************
 
-  //侧边按钮
-  let btnBox = document.createElement('div')
-  btnBox.id = 'wk_btn'
-  btnBox.style =
-    'display:block;z-index:999;position:fixed; right:10px;top:45%; width:70px; height:30px;line-height:30px; background-color:#f50;color:#fff;text-align:center;font-size:16px;font-family:"Microsoft YaHei","微软雅黑",STXihei,"华文细黑",Georgia,"Times New Roman",Arial,sans-serif;font-weight:bold;cursor:pointer'
-  btnBox.innerHTML = '生成答案'
+  function init() {
+    //侧边按钮
+    let btnBox = document.createElement('div')
+    btnBox.id = 'wk_btn'
+    btnBox.style =
+      'display:block;z-index:999;position:fixed; right:10px;top:45%; width:70px; height:30px;line-height:30px; background-color:#f50;color:#fff;text-align:center;font-size:16px;font-family:"Microsoft YaHei","微软雅黑",STXihei,"华文细黑",Georgia,"Times New Roman",Arial,sans-serif;font-weight:bold;cursor:pointer'
+    btnBox.innerHTML = '生成答案'
 
-  // 消息提示框
-  let msgBox = document.createElement('div')
-  msgBox.id = 'wk_msg'
-  msgBox.style =
-    'display:none;z-index:999;position:fixed; left:10%;bottom:10%;width:80%; border-radius: 3px;padding-left: 6px;padding-right: 6px; height:30px;line-height:30px; background-color:#6b6b6b;box-shadow: 6px 6px 4px #e0e0e0;color:#fff;text-align:center;font-size:16px;font-family:"Microsoft YaHei","微软雅黑",STXihei,"华文细黑",Georgia,"Times New Roman",Arial,sans-serif;font-weight:bold;cursor:pointer'
-  msgBox.innerHTML = 'this is dafault msg'
+    // 消息提示框
+    let msgBox = document.createElement('div')
+    msgBox.id = 'wk_msg'
+    msgBox.style =
+      'display:none;z-index:999;position:fixed; left:10%;bottom:10%;width:80%; border-radius: 3px;padding-left: 6px;padding-right: 6px; height:30px;line-height:30px; background-color:#6b6b6b;box-shadow: 6px 6px 4px #e0e0e0;color:#fff;text-align:center;font-size:16px;font-family:"Microsoft YaHei","微软雅黑",STXihei,"华文细黑",Georgia,"Times New Roman",Arial,sans-serif;font-weight:bold;cursor:pointer'
+    msgBox.innerHTML = 'this is dafault msg'
 
-  document.querySelector('body').append(btnBox)
-  document.querySelector('body').append(msgBox)
+    document.querySelector('body').append(btnBox)
+    document.querySelector('body').append(msgBox)
 
-  document.getElementById('wk_btn').addEventListener('click', () => {
-    // 分选答题平台
-    switch (window.location.host) {
-      case 'weibang.youth.cn': // 微邦
-        start(objWB)
-        break
+    document.getElementById('wk_btn').addEventListener('click', () => {
+      // 分选答题平台
+      switch (window.location.host) {
+        case 'weibang.youth.cn': // 微邦
+          start(objWB)
+          break
 
-      case 'www.nnjjtgs.com': // 众学网
-        start(objZXW)
-        break
+        case 'www.nnjjtgs.com': // 众学网
+          start(objZXW)
+          break
 
-      default:
-        alert('当前页面暂不支持自动答题')
-        break
-    }
-  })
+        default:
+          alert('当前页面暂不支持自动答题')
+          break
+      }
+    })
+  }
+
+  init()
 })()
