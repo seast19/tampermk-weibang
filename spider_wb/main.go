@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -245,7 +246,7 @@ func getPhones(examID string) {
 			"my_uid":             "0",
 			"phone":              "phone",
 			"share_examation_id": examID,
-			"topNumber":          500,
+			"topNumber":          10000,
 		}).
 		End()
 	if errs != nil {
@@ -257,13 +258,32 @@ func getPhones(examID string) {
 	data := RankData{}
 	json.Unmarshal([]byte(body), &data)
 
+	fmt.Printf("排行榜共%d人\n", len(data.Data.RankList))
+
 	for _, item := range data.Data.RankList {
-		userList = append(userList, UserInfo{
-			MyUID:            item.UserID,
-			Phone:            item.UserNickName,
-			ShareExamationID: examID,
-		})
+
+		if checkPhone(item.UserNickName) {
+
+			userList = append(userList, UserInfo{
+				// MyUID:            item.UserID,
+				Phone:            item.UserNickName,
+				ShareExamationID: examID,
+			})
+		}
 	}
+}
+
+func checkPhone(s string) bool {
+	r := regexp.MustCompile(`\d{11}`)
+
+	isPhone := r.MatchString(s)
+	if isPhone {
+		fmt.Printf("手机号：%s\n", s)
+		return true
+	}
+
+	// fmt.Printf("非手机号：%s\n", s)
+	return false
 }
 
 // Start 爬虫入口
