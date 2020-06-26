@@ -18,7 +18,8 @@
 
   // 云函数api
   const serverAPI =
-    'https://service-l6svgo68-1254302252.gz.apigw.tencentcs.com/release/weibang_ans_v2'
+    // 'https://service-l6svgo68-1254302252.gz.apigw.tencentcs.com/release/weibang_ans_v2'
+    "https://service-3k85ekq2-1254302252.gz.apigw.tencentcs.com/release/wb_helper_v3"
 
   // 题目答案列表
   let quesionsList = [] //本次题目
@@ -36,6 +37,8 @@
   // 过滤特殊字符串
   function filteSpecialSymbol(oldS) {
     let newS = oldS.replace(//g, '')
+    newS = newS.replace(/ /g, '')
+    newS = newS.replace(/ /g, '')
     newS = newS.replace(/ /g, '')
     newS = newS.replace(/ /g, '')
     newS = newS.replace(/[\n\r]/g, '')

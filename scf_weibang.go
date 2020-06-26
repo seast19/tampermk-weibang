@@ -2,11 +2,11 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"strings"
+	"regexp"
+	"sync"
 
-	"github.com/360EntSecGroup-Skylar/excelize"
+	"github.com/parnurzeal/gorequest"
 	"github.com/tencentyun/scf-go-lib/cloudfunction"
 )
 
@@ -17,6 +17,10 @@ import (
 
 // DefineEvent 入参参数
 type DefineEvent struct {
+	Headers struct {
+		Host string `json:"host"`
+	} `json:"headers"`
+	Path string `json:"path"`
 	Body string `json:"body"` // http请求的 body 参数
 }
 
@@ -36,129 +40,201 @@ type Answer struct {
 }
 
 // 全局题目 答案 列表
-var questionsList = []Question{}
-var answerList = []Answer{}
+// var questionsList = []Question{}
+// var answerList = []Answer{}
 
 // 过滤特殊字符
-func filterSymbol(old string) string {
-	newS := strings.ReplaceAll(old, " ", "")
-	newS = strings.ReplaceAll(newS, "(", "")
-	newS = strings.ReplaceAll(newS, ")", "")
-	newS = strings.ReplaceAll(newS, "（", "")
-	newS = strings.ReplaceAll(newS, "）", "")
-	newS = strings.ReplaceAll(newS, "_", "")
-	newS = strings.ReplaceAll(newS, "", "")
-	newS = strings.ReplaceAll(newS, "\n", "")
-	newS = strings.ReplaceAll(newS, "\r", "")
+// func filterSymbol(old string) string {
+// 	newS := strings.ReplaceAll(old, " ", "")
+// 	newS = strings.ReplaceAll(newS, "(", "")
+// 	newS = strings.ReplaceAll(newS, ")", "")
+// 	newS = strings.ReplaceAll(newS, "（", "")
+// 	newS = strings.ReplaceAll(newS, "）", "")
+// 	newS = strings.ReplaceAll(newS, "_", "")
+// 	newS = strings.ReplaceAll(newS, "", "")
+// 	newS = strings.ReplaceAll(newS, "\n", "")
+// 	newS = strings.ReplaceAll(newS, "\r", "")
 
-	newS = strings.TrimSpace(newS)
+// 	newS = strings.TrimSpace(newS)
 
-	return newS
-}
+// 	return newS
+// }
 
 // 添加答案至全局列表
-func appendAns(ques Question, row []string) {
-	//临时答案
-	tempAns := []string{}
+// func appendAns(ques Question, row []string) {
+// 	//临时答案
+// 	tempAns := []string{}
 
-	//切割答案，以匹配多选
-	ansOptList := strings.Split(row[7], "")
-	for _, ansOpt := range ansOptList {
-		switch ansOpt {
-		case "A":
-			tempAns = append(tempAns, strings.TrimSpace(row[2]))
-		case "B":
-			tempAns = append(tempAns, strings.TrimSpace(row[3]))
-		case "C":
-			tempAns = append(tempAns, strings.TrimSpace(row[4]))
-		case "D":
-			tempAns = append(tempAns, strings.TrimSpace(row[5]))
-		case "E":
-			tempAns = append(tempAns, strings.TrimSpace(row[6]))
-		default:
+// 	//切割答案，以匹配多选
+// 	ansOptList := strings.Split(row[7], "")
+// 	for _, ansOpt := range ansOptList {
+// 		switch ansOpt {
+// 		case "A":
+// 			tempAns = append(tempAns, strings.TrimSpace(row[2]))
+// 		case "B":
+// 			tempAns = append(tempAns, strings.TrimSpace(row[3]))
+// 		case "C":
+// 			tempAns = append(tempAns, strings.TrimSpace(row[4]))
+// 		case "D":
+// 			tempAns = append(tempAns, strings.TrimSpace(row[5]))
+// 		case "E":
+// 			tempAns = append(tempAns, strings.TrimSpace(row[6]))
+// 		default:
 
-		}
+// 		}
+// 	}
+
+// 	//构建答案
+// 	answerList = append(answerList, Answer{
+// 		Q:    ques.Q, //题目原样返回至前端
+// 		A:    tempAns,
+// 		Opt:  row[7],
+// 		Type: row[8],
+// 	})
+
+// }
+
+// 查找数据库中的题目
+func searchquestions(qList []Question) []Answer {
+	fmt.Println("开始获取题目")
+
+	fmt.Printf("原题目共有%d题\n", len(qList))
+
+	answerList := []Answer{}
+
+	count := make(chan int, 3)
+	// allQuestions := make([]Question, len(qList))
+	// copy(allQuestions, qList)
+
+	// tempQList := []Question{}
+
+	// responseAll := []struct {
+	// 	Qid string `json:"qid"`
+	// }{}
+
+	// lock := sync.Mutex
+	var lock sync.Mutex
+	var wg sync.WaitGroup
+
+	// 构件ids参数，用于查询
+	for _, qitem := range qList {
+		//构建答案
+		// idLiist := []string{}
+		// for _, qitem := range qList {
+		// 	idLiist = append(idLiist, qitem.QuestionID)
+		// }
+		// idListStr, err := json.Marshal(idLiist)
+		// if err != nil {
+		// 	fmt.Println(err)
+		// 	return []Question{}
+		// }
+
+		wg.Add(1)
+		go func(qitem Question) {
+			count <- 0
+			defer func() {
+				<-count
+				wg.Done()
+			}()
+
+			// 查询数据库相同的题目
+			query := fmt.Sprintf(`?where={"question":"%s","selects":"%s"}`, qitem.Q, qitem.OptA)
+			request := gorequest.New()
+			_, body, errs := request.Get("https://lc-api.seast.net/1.1/classes/wb_questions"+query).
+				Set("X-LC-Id", "hYVRtO7xCsS9k7ac4o9bfjKn-gzGzoHsz").
+				Set("X-LC-Key", "u8XIvYFinbdemgmcSeFrLf87").
+				End()
+			if errs != nil {
+				fmt.Println(errs)
+				return
+			}
+
+			fmt.Println(body)
+
+			data := struct {
+				Results []struct {
+					QID      string   `json:"qid"`
+					Question string   `json:"question"`
+					Answer   string   `json:"answer"`
+					Type     string   `json:"type"`
+					Selects  []string `json:"selects"`
+					Title    string   `json:"title"`
+					Website  string   `json:"website"`
+				} `json:"results"`
+			}{}
+
+			err := json.Unmarshal([]byte(body), &data)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+
+			// fmt.Println(data)
+
+			if len(data.Results) > 0 {
+				lock.Lock()
+				answerList = append(answerList, Answer{
+					Q:    data.Results[0].Question,
+					A:    data.Results[0].Selects,
+					Opt:  data.Results[0].Answer,
+					Type: data.Results[0].Type,
+				})
+				lock.Unlock()
+			}
+		}(qitem)
+
 	}
 
-	//构建答案
-	answerList = append(answerList, Answer{
-		Q:    ques.Q, //题目原样返回至前端
-		A:    tempAns,
-		Opt:  row[7],
-		Type: row[8],
-	})
+	wg.Wait()
 
+	return answerList
 }
 
-// MatchAns 生成答案
-func MatchAns() error {
-	// 打开题库文件
-	f, err := excelize.OpenFile("./lib2020-06-13.xlsx")
-	if err != nil {
-		fmt.Println("[MatchAns]打开xlsx失败->", err)
-		return errors.New("打开题库文件失败")
-	}
-	rows := f.GetRows("Sheet1")
-
-	// 逆序题目，保证匹配到最新的题目
-	length := len(rows)
-	for i := 0; i < length/2; i++ {
-		temp := rows[length-1-i]
-		rows[length-1-i] = rows[i]
-		rows[i] = temp
+// 添加数据库中的某个examid
+func addExamID(examID string) {
+	if len(examID) == 0 {
+		return
 	}
 
-	//循环题目，获取答案
-repeat:
-	for quesNum, ques := range questionsList {
-		// 首先查找type opta q 参数均匹配的
-		for _, row := range rows {
-			// 将题目中的特殊字符去掉后进行对比，题目一致且选项A也一致才认为相同
-			if filterSymbol(ques.Q) == filterSymbol(row[1]) && filterSymbol(ques.OptA) == filterSymbol(row[2]) && filterSymbol(ques.Type) == filterSymbol(row[8]) {
-				fmt.Printf("[%s]\t[第%d题]->%s\n", row[7], quesNum+1, row[1])
-
-				appendAns(ques, row)
-
-				//匹配完答案则下一题
-				continue repeat
-			}
-		}
-
-		// 没有的话查找 opta q 参数匹配的
-		for _, row := range rows {
-			// 将题目中的特殊字符去掉后进行对比，题目一致且选项A也一致才认为相同
-			if filterSymbol(ques.Q) == filterSymbol(row[1]) && filterSymbol(ques.OptA) == filterSymbol(row[2]) {
-				fmt.Printf("[%s]\t[第%d题]->%s\n", row[7], quesNum+1, row[1])
-
-				appendAns(ques, row)
-
-				//匹配完答案则下一题
-				continue repeat
-			}
-		}
-
-		// 没有的话查找 q 参数匹配的
-		for _, row := range rows {
-			// 将题目中的特殊字符去掉后进行对比，题目一致且选项A也一致才认为相同
-			if filterSymbol(ques.Q) == filterSymbol(row[1]) {
-				fmt.Printf("[%s]\t[第%d题]->%s\n", row[7], quesNum+1, row[1])
-
-				appendAns(ques, row)
-
-				//匹配完答案则下一题
-				continue repeat
-			}
-		}
+	data := struct {
+		ExamIDs struct {
+			Op      string   `json:"__op"`
+			Objects []string `json:"objects"`
+		} `json:"exam_ids"`
+	}{
+		ExamIDs: struct {
+			Op      string   `json:"__op"`
+			Objects []string `json:"objects"`
+		}{
+			Op: "AddUnique",
+			Objects: []string{
+				examID,
+			},
+		},
 	}
 
-	return nil
+	request := gorequest.New()
+	_, body, errs := request.Put("https://lc-api.seast.net/1.1/classes/wb_examid/5ef4745dbaa3480008004933").
+		Set("X-LC-Id", "hYVRtO7xCsS9k7ac4o9bfjKn-gzGzoHsz").
+		Set("X-LC-Key", "u8XIvYFinbdemgmcSeFrLf87").
+		Send(data).
+		End()
+	if errs != nil {
+		fmt.Printf("getPhone 发送请求错误")
+		fmt.Println(errs)
+		return
+	}
+
+	fmt.Println(body)
 }
 
 // Scf 云函数入口
 func Scf(event DefineEvent) ([]Answer, error) {
+	fmt.Println(event)
+
 	// 初始化题目和答案列表
-	questionsList = []Question{}
-	answerList = []Answer{}
+	questionsList := []Question{}
+	// answerList := []Answer{}
 
 	//反序列化json获取题目list
 	err := json.Unmarshal([]byte(event.Body), &questionsList)
@@ -176,11 +252,37 @@ func Scf(event DefineEvent) ([]Answer, error) {
 	fmt.Println("************************")
 
 	// 查询答案
-	MatchAns()
+	// MatchAns()
+	answerList := searchquestions(questionsList)
+
+	// 有查找不到的题目则加入examid
+	if len(questionsList) != len(answerList) {
+
+		if event.Headers.Host == "weibang.youth.cn" {
+			// 匹配examid
+			r := regexp.MustCompile(`detail/(.*?)/showDetail/`)
+			res := r.FindStringSubmatch(event.Path)
+
+			if len(res) == 2 {
+				addExamID(res[1])
+			}
+		}
+
+	}
 
 	return answerList, nil
 }
 
 func main() {
+	// test()
 	cloudfunction.Start(Scf)
+
+}
+
+func test() {
+	path := "https://weibang.youth.cn/webpage_sapi/examination/detail/2iWIg5Xb3FIinROD/showDetail/0/phone/platform/45c01a/orgId/httphost/httpport/token"
+
+	r := regexp.MustCompile(`detail/(.*?)/showDetail/`)
+	res := r.FindStringSubmatch(path)
+	fmt.Println(res)
 }
