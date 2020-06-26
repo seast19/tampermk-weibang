@@ -12,7 +12,7 @@ import (
 
 /*
 微邦答题助手
-腾讯云SCF 后台 v2
+腾讯云SCF 后台 v3
 */
 
 // DefineEvent 入参参数
@@ -35,11 +35,11 @@ type Answer struct {
 	Type string   `json:"type"` //类型
 }
 
-// 查找数据库中的题目
-func searchquestions(qList []Question) []Answer {
-	fmt.Println("开始获取题目")
+// SearchQuestions 查找数据库中的题目
+func SearchQuestions(qList []Question) []Answer {
+	fmt.Println("<!!> 开始获取题目")
 
-	fmt.Printf("原题目共有%d题\n", len(qList))
+	fmt.Printf("原题目共有 %d 题\n", len(qList))
 
 	answerList := []Answer{}
 	count := make(chan int, 3)
@@ -49,9 +49,10 @@ func searchquestions(qList []Question) []Answer {
 
 	// 构件ids参数，用于查询
 	for _, qitem := range qList {
+		// 开启3个线程
 		wg.Add(1)
+		count <- 0
 		go func(qitem Question) {
-			count <- 0
 			defer func() {
 				<-count
 				wg.Done()
@@ -68,8 +69,6 @@ func searchquestions(qList []Question) []Answer {
 				fmt.Println(errs)
 				return
 			}
-
-			// fmt.Println(body)
 
 			data := struct {
 				Results []struct {
@@ -94,9 +93,27 @@ func searchquestions(qList []Question) []Answer {
 			if len(data.Results) > 0 {
 				lock.Lock()
 				fmt.Printf("查到了 %s \n", data.Results[0].QID)
+
+				// 解析正确答案
+				tempAnss := []string{}
+				for _, v := range []rune(data.Results[0].Answer) {
+					if string(v) == "A" {
+						tempAnss = append(tempAnss, data.Results[0].Selects[0])
+					} else if string(v) == "B" {
+						tempAnss = append(tempAnss, data.Results[0].Selects[1])
+					} else if string(v) == "C" {
+						tempAnss = append(tempAnss, data.Results[0].Selects[2])
+					} else if string(v) == "D" {
+						tempAnss = append(tempAnss, data.Results[0].Selects[3])
+					} else if string(v) == "E" {
+						tempAnss = append(tempAnss, data.Results[0].Selects[4])
+					} else if string(v) == "F" {
+						tempAnss = append(tempAnss, data.Results[0].Selects[5])
+					}
+				}
 				answerList = append(answerList, Answer{
 					Q:    data.Results[0].Question,
-					A:    data.Results[0].Selects,
+					A:    tempAnss,
 					Opt:  data.Results[0].Answer,
 					Type: data.Results[0].Type,
 				})
@@ -163,7 +180,7 @@ func Scf(event DefineEvent) ([]Answer, error) {
 	//反序列化json获取题目list
 	err := json.Unmarshal([]byte(event.Body), &requestData)
 	if err != nil {
-		fmt.Println("反序列化输入失败", err)
+		fmt.Println("输入内容反序列化输入失败", err)
 		return []Answer{}, err
 	}
 
@@ -179,18 +196,17 @@ func Scf(event DefineEvent) ([]Answer, error) {
 
 	// 查询答案
 
-	answerList := searchquestions(questionsList)
+	answerList := SearchQuestions(questionsList)
 
 	// 有查找不到的题目则加入examid
 	if len(questionsList) != len(answerList) {
-
 		if requestData.Host == "weibang.youth.cn" {
 			// 匹配examid
 			r := regexp.MustCompile(`detail/(.*?)/showDetail/`)
 			res := r.FindStringSubmatch(requestData.URL)
 
 			if len(res) == 2 {
-				fmt.Printf("添加examid  %s\n", res[1])
+				fmt.Printf("添加 examid  %s\n", res[1])
 				addExamID(res[1])
 			}
 		}

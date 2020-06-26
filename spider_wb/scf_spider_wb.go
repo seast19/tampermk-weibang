@@ -18,7 +18,7 @@ const (
 	CusUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1"
 )
 
-// DetailData detail数据结构
+// DetailData detail页面数据结构
 type DetailData struct {
 	Data struct {
 		Detail struct {
@@ -41,7 +41,7 @@ type RankData struct {
 
 // *************************
 
-// DataStruct 数据结构体
+// DataStruct 考试记录数据结构体
 type DataStruct struct {
 	Data struct {
 		QuestionList []Question `json:"questionList"`
@@ -65,12 +65,12 @@ type ExamID struct {
 	UpdateTime int64    `json:"update_time"`
 }
 
-// UploadData 上传题目的格式
+// UploadData 数据库上传题目的格式
 type UploadData struct {
 	Requests []UploadDataBody `json:"requests"`
 }
 
-// UploadDataBody 上传题目的格式body
+// UploadDataBody 数据库上传题目的格式body
 type UploadDataBody struct {
 	Method string `json:"method"`
 	Path   string `json:"path"`
@@ -85,9 +85,9 @@ type UploadDataBody struct {
 	} `json:"body"`
 }
 
-// 获取数据库的examID
-func getExamID() ([]string, error) {
-	fmt.Println("开始获取数据库 exanid")
+// GetExamID 获取数据库的examID
+func GetExamID() ([]string, error) {
+	fmt.Println("<!!> 开始获取数据库 exanid")
 
 	// 获取examids
 	request := gorequest.New()
@@ -106,7 +106,6 @@ func getExamID() ([]string, error) {
 		fmt.Printf("反序列化examid失败 -> %s", err)
 		return []string{}, err
 	}
-	// fmt.Println(data)
 
 	// 检查更新时间，一个小时内更新了的话就不操作
 	if time.Now().Unix()-data.UpdateTime < 60*60 {
@@ -118,10 +117,10 @@ func getExamID() ([]string, error) {
 	return data.ExamIDs, nil
 }
 
-// 获取详细信息
-func getDetail(examID string) (*DetailData, error) {
+// GetDetail 获取详细页面信息
+func GetDetail(examID string) (*DetailData, error) {
 
-	fmt.Println("开始获取试卷详细信息")
+	fmt.Println("<!!> 开始获取试卷详细信息")
 
 	request := gorequest.New()
 	_, body, errs := request.Post("https://weibang.youth.cn/sapi/v1/share_examination/getShareExaminationDetail").
@@ -172,7 +171,7 @@ func deleteExamID(examID string) {
 	}
 
 	request := gorequest.New()
-	_, body, errs := request.Put("https://lc-api.seast.net/1.1/classes/wb_examid/5ef4745dbaa3480008004933").
+	_, _, errs := request.Put("https://lc-api.seast.net/1.1/classes/wb_examid/5ef4745dbaa3480008004933").
 		Set("X-LC-Id", "hYVRtO7xCsS9k7ac4o9bfjKn-gzGzoHsz").
 		Set("X-LC-Key", "u8XIvYFinbdemgmcSeFrLf87").
 		Send(data).
@@ -183,10 +182,10 @@ func deleteExamID(examID string) {
 		return
 	}
 
-	fmt.Println(body)
+	fmt.Println("[tools] 删除 examid 完成")
 }
 
-// 添加数据库中的某个examid
+// 添加 examid 到数据库
 func addExamID(examID string) {
 	data := struct {
 		ExamIDs struct {
@@ -206,7 +205,7 @@ func addExamID(examID string) {
 	}
 
 	request := gorequest.New()
-	_, body, errs := request.Put("https://lc-api.seast.net/1.1/classes/wb_examid/5ef4745dbaa3480008004933").
+	_, _, errs := request.Put("https://lc-api.seast.net/1.1/classes/wb_examid/5ef4745dbaa3480008004933").
 		Set("X-LC-Id", "hYVRtO7xCsS9k7ac4o9bfjKn-gzGzoHsz").
 		Set("X-LC-Key", "u8XIvYFinbdemgmcSeFrLf87").
 		Send(data).
@@ -217,12 +216,12 @@ func addExamID(examID string) {
 		return
 	}
 
-	fmt.Println(body)
+	fmt.Println("[tools] 添加examid到数据库完毕")
 }
 
-// 获取手机号
-func getPhones(examID string) ([]string, error) {
-	fmt.Println("开始获取手机号")
+// GetPhones 获取手机号
+func GetPhones(examID string) ([]string, error) {
+	fmt.Println("<!!> 开始获取手机号")
 
 	// 从排行榜获取个人信息
 	request := gorequest.New()
@@ -248,22 +247,22 @@ func getPhones(examID string) ([]string, error) {
 		return []string{}, err
 	}
 
-	fmt.Printf("排行榜共%d人\n", len(data.Data.RankList))
+	fmt.Printf("排行榜共 %d 人\n", len(data.Data.RankList))
 
 	phoneList := []string{}
 	for _, item := range data.Data.RankList {
-		if checkPhone(item.UserNickName) {
+		if isPhone(item.UserNickName) {
 			phoneList = append(phoneList, item.UserNickName)
 		}
 	}
 
-	fmt.Printf("有效号码 %d 个\n", len(phoneList))
+	fmt.Printf("有效手机号码 %d 个\n", len(phoneList))
 	return phoneList, nil
 }
 
-//获取含有答案的题目
-func getQuesWithAns(phoneList []string) []Question {
-	fmt.Println("开始获取题目")
+// GetQuesWithAns 获取含有答案的题目
+func GetQuesWithAns(phoneList []string) []Question {
+	fmt.Println("<!!> 开始获取题目")
 
 	qList := []Question{}
 
@@ -286,6 +285,7 @@ func getQuesWithAns(phoneList []string) []Question {
 			continue
 		}
 
+		// 保存不重复的题目
 	noRepeat:
 		for _, v := range data.Data.QuestionList {
 			// 若有重复的则跳过
@@ -329,7 +329,7 @@ func type2str(t int) string {
 }
 
 // 检查号码是否为手机号
-func checkPhone(s string) bool {
+func isPhone(s string) bool {
 	r := regexp.MustCompile(`^\d{11}$`)
 	isPhone := r.MatchString(s)
 	if isPhone {
@@ -338,11 +338,14 @@ func checkPhone(s string) bool {
 	return false
 }
 
-// 检查题目，看是否重复
-func checkQuestionsRepeat(qList []Question) []Question {
-	fmt.Println("开始检查数据库是否有重复题目")
+// CheckQuestionsRepeat 检查题目，看是否重复
+func CheckQuestionsRepeat(qList []Question) []Question {
+	/** 通过 qid 查询数据库获取有 qid 的题目，再将所有题目与数据库返回的数据比较，获得不重复的题目
+	 */
 
-	fmt.Printf("原题目共有%d题\n", len(qList))
+	fmt.Println("<!!> 开始检查数据库是否有重复题目")
+
+	fmt.Printf("原题目共有 %d 题\n", len(qList))
 
 	allQuestions := make([]Question, len(qList))
 	copy(allQuestions, qList)
@@ -358,12 +361,11 @@ func checkQuestionsRepeat(qList []Question) []Question {
 		// 大于100则取前100个，小于100则取完
 		if len(allQuestions) > 100 {
 			tempQList = allQuestions[0:100]
-
 		} else {
 			tempQList = allQuestions
 		}
 
-		fmt.Printf("[分次查询]本次查询题目 %d 个\n", len(tempQList))
+		fmt.Printf("[分次查询] 本次查询题目 %d 个\n", len(tempQList))
 
 		// 构件ids参数，用于查询
 		idLiist := []string{}
@@ -400,7 +402,7 @@ func checkQuestionsRepeat(qList []Question) []Question {
 			return []Question{}
 		}
 
-		fmt.Printf("[分次查询]数据库有 %d 个重复\n", len(data.Results))
+		fmt.Printf("[分次查询] 数据库有 %d 个重复\n", len(data.Results))
 
 		responseAll = append(responseAll, data.Results...)
 
@@ -435,21 +437,20 @@ func checkQuestionsRepeat(qList []Question) []Question {
 
 }
 
-// 提交题目
-func submitQuestions(qList []Question, detail DetailData) {
-	fmt.Println("开始提交题目到数据库")
+// SubmitQuestions 提交题目
+func SubmitQuestions(qList []Question, detail DetailData) {
+	fmt.Println("<!!> 开始提交题目到数据库")
 
 	tempQList := []Question{}
 
 	for true {
 		if len(qList) > 300 {
 			tempQList = qList[0:300]
-
 		} else {
 			tempQList = qList
 		}
 
-		fmt.Printf("[分次查询]本次上传题目 %d 个\n", len(tempQList))
+		fmt.Printf("[分次查询] 本次上传题目 %d 个\n", len(tempQList))
 
 		// 构建body
 		bodys := []UploadDataBody{}
@@ -500,7 +501,7 @@ func submitQuestions(qList []Question, detail DetailData) {
 			return
 		}
 
-		fmt.Println("[分次查询]上传题目成功")
+		fmt.Println("[分次查询] 上传题目成功")
 
 		// 退出条件
 		if len(qList) > 300 {
@@ -509,7 +510,6 @@ func submitQuestions(qList []Question, detail DetailData) {
 			break
 		}
 	}
-
 }
 
 // 过滤特殊字符
@@ -518,9 +518,7 @@ func filterSymbol(old string) string {
 	newS = strings.ReplaceAll(newS, "", "")
 	newS = strings.ReplaceAll(newS, "\n", "")
 	newS = strings.ReplaceAll(newS, "\r", "")
-
 	newS = strings.TrimSpace(newS)
-
 	return newS
 }
 
@@ -528,38 +526,38 @@ func filterSymbol(old string) string {
 func Scf() (string, error) {
 
 	// 获取数据库中的exam id
-	examIDs, err := getExamID()
+	examIDs, err := GetExamID()
 	if err != nil {
 		fmt.Println(err)
-		return "error", err
+		return "error #1", err
 	}
 
 	for _, examID := range examIDs {
-		fmt.Println("***********")
+		fmt.Println("***********************")
 		fmt.Printf("当前执行 %s\n", examID)
 
 		// 根据examid获取详细信息，检查答题是否结束
-		detail, err := getDetail(examID)
+		detail, err := GetDetail(examID)
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
 		nowTime := time.Now().UnixNano() / 1e6
 		if nowTime < detail.Data.Detail.StartTime || nowTime > detail.Data.Detail.EndTime {
-			fmt.Printf("%s - %s 已超出答题时间，删除题目", detail.Data.Detail.Title, examID)
+			fmt.Printf("%s - %s 已超出答题时间，删除examid", detail.Data.Detail.Title, examID)
 			deleteExamID(examID)
 			continue
 		}
 
 		// 获取排行榜的手机号
-		phoneList, err := getPhones(examID)
+		phoneList, err := GetPhones(examID)
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
 
 		if len(phoneList) == 0 {
-			fmt.Println("电话号码数为 0 ")
+			fmt.Println("电话号码数量为 0 ")
 			continue
 		}
 
@@ -567,24 +565,23 @@ func Scf() (string, error) {
 		phoneList = randArr(phoneList)
 		if len(phoneList) > 100 {
 			phoneList = phoneList[:100]
-
 		}
 
 		// 根据手机号获取题目
-		qList := getQuesWithAns(phoneList)
+		qList := GetQuesWithAns(phoneList)
 
 		// 检查题目重复
-		qList = checkQuestionsRepeat(qList)
+		qList = CheckQuestionsRepeat(qList)
 		if len(qList) == 0 {
 			fmt.Println("获得的新题目题数为 0 ")
 			continue
 		}
 
 		// 提交题目
-		submitQuestions(qList, *detail)
+		SubmitQuestions(qList, *detail)
 	}
 
-	fmt.Println("程序结束")
+	fmt.Println("********** 程序结束 **********")
 	return "ok", nil
 }
 
