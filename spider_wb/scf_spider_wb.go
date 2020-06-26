@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/parnurzeal/gorequest"
+	"github.com/tencentyun/scf-go-lib/cloudfunction"
 )
 
 // 自定义爬虫参数
@@ -337,28 +338,6 @@ func checkPhone(s string) bool {
 	return false
 }
 
-// 过滤题目中的特殊字符
-// func filteQuestions(qList []Question) {
-// 	newList := []Question{}
-// 	for _, item := range qList {
-// 		tempAns :=[]string{}
-
-// 		for _,v2:=range item.Selects
-
-// 		newList = append(newList, Question{
-// 			Content:       filterSymbol(item.Content),
-// 			QuestionID:    item.QuestionID,
-// 			CorrectAnswer: item.Content,
-// 			QuestionType:  item.QuestionType,
-// 			Selects: []struct {
-// 				Content string `json:"content"`
-// 			}{
-
-// 			},
-// 		})
-// 	}
-// }
-
 // 检查题目，看是否重复
 func checkQuestionsRepeat(qList []Question) []Question {
 	fmt.Println("开始检查数据库是否有重复题目")
@@ -384,7 +363,7 @@ func checkQuestionsRepeat(qList []Question) []Question {
 			tempQList = allQuestions
 		}
 
-		fmt.Printf("[分次查询]本次题目数 %d \n", len(tempQList))
+		fmt.Printf("[分次查询]本次查询题目 %d 个\n", len(tempQList))
 
 		// 构件ids参数，用于查询
 		idLiist := []string{}
@@ -397,7 +376,7 @@ func checkQuestionsRepeat(qList []Question) []Question {
 			return []Question{}
 		}
 
-		// 查询数据库相同的题目
+		// 查询数据库相同的题目（使用qid查询）
 		query := fmt.Sprintf(`?keys=qid&where={"qid":{"$in":%s}}`, string(idListStr))
 		request := gorequest.New()
 		_, body, errs := request.Get("https://lc-api.seast.net/1.1/classes/wb_questions"+query).
@@ -470,7 +449,7 @@ func submitQuestions(qList []Question, detail DetailData) {
 			tempQList = qList
 		}
 
-		fmt.Printf("[分次查询]本次题目 %d 个\n", len(tempQList))
+		fmt.Printf("[分次查询]本次上传题目 %d 个\n", len(tempQList))
 
 		// 构建body
 		bodys := []UploadDataBody{}
@@ -481,6 +460,7 @@ func submitQuestions(qList []Question, detail DetailData) {
 				ansList = append(ansList, filterSymbol(ans.Content))
 			}
 
+			// 将question、selects 进行去除特殊字符
 			dataBody := UploadDataBody{
 				Method: "POST",
 				Path:   "/1.1/classes/wb_questions",
@@ -510,7 +490,7 @@ func submitQuestions(qList []Question, detail DetailData) {
 		}
 
 		request := gorequest.New()
-		_, body, errs := request.Post("https://lc-api.seast.net/1.1/batch").
+		_, _, errs := request.Post("https://lc-api.seast.net/1.1/batch").
 			Set("X-LC-Id", "hYVRtO7xCsS9k7ac4o9bfjKn-gzGzoHsz").
 			Set("X-LC-Key", "u8XIvYFinbdemgmcSeFrLf87").
 			Send(data).
@@ -520,7 +500,7 @@ func submitQuestions(qList []Question, detail DetailData) {
 			return
 		}
 
-		// fmt.Println(body)
+		fmt.Println("[分次查询]上传题目成功")
 
 		// 退出条件
 		if len(qList) > 300 {
@@ -535,11 +515,6 @@ func submitQuestions(qList []Question, detail DetailData) {
 // 过滤特殊字符
 func filterSymbol(old string) string {
 	newS := strings.ReplaceAll(old, " ", "")
-	// newS = strings.ReplaceAll(newS, "(", "")
-	// newS = strings.ReplaceAll(newS, ")", "")
-	// newS = strings.ReplaceAll(newS, "（", "")
-	// newS = strings.ReplaceAll(newS, "）", "")
-	// newS = strings.ReplaceAll(newS, "_", "")
 	newS = strings.ReplaceAll(newS, "", "")
 	newS = strings.ReplaceAll(newS, "\n", "")
 	newS = strings.ReplaceAll(newS, "\r", "")
@@ -549,18 +524,18 @@ func filterSymbol(old string) string {
 	return newS
 }
 
-func main() {
-
-	// cloudfunction.Start(Scf)
+// Scf 入口函数
+func Scf() (string, error) {
 
 	// 获取数据库中的exam id
 	examIDs, err := getExamID()
 	if err != nil {
 		fmt.Println(err)
-		return
+		return "error", err
 	}
 
 	for _, examID := range examIDs {
+		fmt.Println("***********")
 		fmt.Printf("当前执行 %s\n", examID)
 
 		// 根据examid获取详细信息，检查答题是否结束
@@ -584,7 +559,7 @@ func main() {
 		}
 
 		if len(phoneList) == 0 {
-			fmt.Println("phoneList is 0")
+			fmt.Println("电话号码数为 0 ")
 			continue
 		}
 
@@ -598,15 +573,22 @@ func main() {
 		// 根据手机号获取题目
 		qList := getQuesWithAns(phoneList)
 
-		// 过滤特殊字符
-		// qList = filteQuestions(qList)
 		// 检查题目重复
 		qList = checkQuestionsRepeat(qList)
+		if len(qList) == 0 {
+			fmt.Println("获得的新题目题数为 0 ")
+			continue
+		}
 
 		// 提交题目
 		submitQuestions(qList, *detail)
 	}
 
 	fmt.Println("程序结束")
+	return "ok", nil
+}
 
+func main() {
+	cloudfunction.Start(Scf)
+	// Scf()
 }

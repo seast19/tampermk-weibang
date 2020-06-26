@@ -2,7 +2,7 @@
 // @name         微邦答题助手(CMD)
 // @namespace    https://greasyfork.org/zh-CN/users/563657-seast19
 // @description  微邦自动匹配答案脚本，解放你的大脑
-// @version      1.2.2
+// @version      2.0.0
 // @author       seast19
 // @icon         https://s1.ax1x.com/2020/05/18/YWucdO.png
 // @match        https://weibang.youth.cn/webpage_sapi/examination/detail/*/showDetail/0/phone/platform/*/orgId/httphost/httpport/token
@@ -18,7 +18,8 @@
 
   // 云函数api
   const serverAPI =
-    'https://service-l6svgo68-1254302252.gz.apigw.tencentcs.com/release/weibang_ans_v2'
+    // 'https://service-l6svgo68-1254302252.gz.apigw.tencentcs.com/release/weibang_ans_v2'
+    'https://service-3k85ekq2-1254302252.gz.apigw.tencentcs.com/release/wb_helper_v3'
 
   // 题目答案列表
   let quesionsList = [] //本次题目
@@ -36,8 +37,7 @@
   // 过滤特殊字符串
   function filteSpecialSymbol(oldS) {
     let newS = oldS.replace(//g, '')
-    newS = newS.replace(/ /g, '')
-    newS = newS.replace(/ /g, '')
+    newS = newS.replace(/ /g, '')   
     newS = newS.replace(/[\n\r]/g, '')
     return newS
   }
@@ -124,14 +124,25 @@
 
   // 通用从服务器获取答案
   function getAnswers() {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {   
+
       //跨域请求
       GM_xmlhttpRequest({
         method: 'post',
         url: serverAPI,
-        data: JSON.stringify(quesionsList),
+        data: JSON.stringify({
+          host: window.location.host,
+          url: window.location.href,
+          data: quesionsList,
+        }),
         onload: function (res) {
-          answerList = JSON.parse(res.responseText) || []
+          answerList = JSON.parse(res.responseText)
+
+          if (answerList.length == undefined) {
+            reject('获取题目失败')
+            return
+          }
+
           console.log(
             `后台共匹配 ${answerList.length}/${quesionsList.length} 条题目`
           )

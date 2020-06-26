@@ -17,10 +17,6 @@ import (
 
 // DefineEvent 入参参数
 type DefineEvent struct {
-	Headers struct {
-		Host string `json:"host"`
-	} `json:"headers"`
-	Path string `json:"path"`
 	Body string `json:"body"` // http请求的 body 参数
 }
 
@@ -39,61 +35,6 @@ type Answer struct {
 	Type string   `json:"type"` //类型
 }
 
-// 全局题目 答案 列表
-// var questionsList = []Question{}
-// var answerList = []Answer{}
-
-// 过滤特殊字符
-// func filterSymbol(old string) string {
-// 	newS := strings.ReplaceAll(old, " ", "")
-// 	newS = strings.ReplaceAll(newS, "(", "")
-// 	newS = strings.ReplaceAll(newS, ")", "")
-// 	newS = strings.ReplaceAll(newS, "（", "")
-// 	newS = strings.ReplaceAll(newS, "）", "")
-// 	newS = strings.ReplaceAll(newS, "_", "")
-// 	newS = strings.ReplaceAll(newS, "", "")
-// 	newS = strings.ReplaceAll(newS, "\n", "")
-// 	newS = strings.ReplaceAll(newS, "\r", "")
-
-// 	newS = strings.TrimSpace(newS)
-
-// 	return newS
-// }
-
-// 添加答案至全局列表
-// func appendAns(ques Question, row []string) {
-// 	//临时答案
-// 	tempAns := []string{}
-
-// 	//切割答案，以匹配多选
-// 	ansOptList := strings.Split(row[7], "")
-// 	for _, ansOpt := range ansOptList {
-// 		switch ansOpt {
-// 		case "A":
-// 			tempAns = append(tempAns, strings.TrimSpace(row[2]))
-// 		case "B":
-// 			tempAns = append(tempAns, strings.TrimSpace(row[3]))
-// 		case "C":
-// 			tempAns = append(tempAns, strings.TrimSpace(row[4]))
-// 		case "D":
-// 			tempAns = append(tempAns, strings.TrimSpace(row[5]))
-// 		case "E":
-// 			tempAns = append(tempAns, strings.TrimSpace(row[6]))
-// 		default:
-
-// 		}
-// 	}
-
-// 	//构建答案
-// 	answerList = append(answerList, Answer{
-// 		Q:    ques.Q, //题目原样返回至前端
-// 		A:    tempAns,
-// 		Opt:  row[7],
-// 		Type: row[8],
-// 	})
-
-// }
-
 // 查找数据库中的题目
 func searchquestions(qList []Question) []Answer {
 	fmt.Println("开始获取题目")
@@ -101,34 +42,13 @@ func searchquestions(qList []Question) []Answer {
 	fmt.Printf("原题目共有%d题\n", len(qList))
 
 	answerList := []Answer{}
-
 	count := make(chan int, 3)
-	// allQuestions := make([]Question, len(qList))
-	// copy(allQuestions, qList)
 
-	// tempQList := []Question{}
-
-	// responseAll := []struct {
-	// 	Qid string `json:"qid"`
-	// }{}
-
-	// lock := sync.Mutex
 	var lock sync.Mutex
 	var wg sync.WaitGroup
 
 	// 构件ids参数，用于查询
 	for _, qitem := range qList {
-		//构建答案
-		// idLiist := []string{}
-		// for _, qitem := range qList {
-		// 	idLiist = append(idLiist, qitem.QuestionID)
-		// }
-		// idListStr, err := json.Marshal(idLiist)
-		// if err != nil {
-		// 	fmt.Println(err)
-		// 	return []Question{}
-		// }
-
 		wg.Add(1)
 		go func(qitem Question) {
 			count <- 0
@@ -149,7 +69,7 @@ func searchquestions(qList []Question) []Answer {
 				return
 			}
 
-			fmt.Println(body)
+			// fmt.Println(body)
 
 			data := struct {
 				Results []struct {
@@ -173,6 +93,7 @@ func searchquestions(qList []Question) []Answer {
 
 			if len(data.Results) > 0 {
 				lock.Lock()
+				fmt.Printf("查到了 %s \n", data.Results[0].QID)
 				answerList = append(answerList, Answer{
 					Q:    data.Results[0].Question,
 					A:    data.Results[0].Selects,
@@ -187,6 +108,7 @@ func searchquestions(qList []Question) []Answer {
 
 	wg.Wait()
 
+	fmt.Printf("共查到 %d 题\n", len(answerList))
 	return answerList
 }
 
@@ -225,23 +147,27 @@ func addExamID(examID string) {
 		return
 	}
 
-	fmt.Println(body)
+	fmt.Printf("添加状态 -> %s\n", body)
 }
 
 // Scf 云函数入口
 func Scf(event DefineEvent) ([]Answer, error) {
-	fmt.Println(event)
-
 	// 初始化题目和答案列表
-	questionsList := []Question{}
-	// answerList := []Answer{}
+
+	requestData := struct {
+		Host string     `json:"host"`
+		URL  string     `json:"url"`
+		Data []Question `json:"data"`
+	}{}
 
 	//反序列化json获取题目list
-	err := json.Unmarshal([]byte(event.Body), &questionsList)
+	err := json.Unmarshal([]byte(event.Body), &requestData)
 	if err != nil {
 		fmt.Println("反序列化输入失败", err)
-		return nil, err
+		return []Answer{}, err
 	}
+
+	questionsList := requestData.Data
 
 	fmt.Println("题目输入:")
 	if len(questionsList) > 0 {
@@ -252,18 +178,19 @@ func Scf(event DefineEvent) ([]Answer, error) {
 	fmt.Println("************************")
 
 	// 查询答案
-	// MatchAns()
+
 	answerList := searchquestions(questionsList)
 
 	// 有查找不到的题目则加入examid
 	if len(questionsList) != len(answerList) {
 
-		if event.Headers.Host == "weibang.youth.cn" {
+		if requestData.Host == "weibang.youth.cn" {
 			// 匹配examid
 			r := regexp.MustCompile(`detail/(.*?)/showDetail/`)
-			res := r.FindStringSubmatch(event.Path)
+			res := r.FindStringSubmatch(requestData.URL)
 
 			if len(res) == 2 {
+				fmt.Printf("添加examid  %s\n", res[1])
 				addExamID(res[1])
 			}
 		}
@@ -276,13 +203,8 @@ func Scf(event DefineEvent) ([]Answer, error) {
 func main() {
 	// test()
 	cloudfunction.Start(Scf)
+	// Scf(DefineEvent{
+	// 	Body: `{"host":"xxx","url":"xxxxxx"}`,
+	// })
 
-}
-
-func test() {
-	path := "https://weibang.youth.cn/webpage_sapi/examination/detail/2iWIg5Xb3FIinROD/showDetail/0/phone/platform/45c01a/orgId/httphost/httpport/token"
-
-	r := regexp.MustCompile(`detail/(.*?)/showDetail/`)
-	res := r.FindStringSubmatch(path)
-	fmt.Println(res)
 }
