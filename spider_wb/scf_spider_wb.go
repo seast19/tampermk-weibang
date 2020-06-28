@@ -148,7 +148,7 @@ func GetDetail(examID string) (*DetailData, error) {
 
 	}
 
-	fmt.Printf("试卷标题 %s", data.Data.Detail.Title)
+	fmt.Printf("试卷标题 %s\n", data.Data.Detail.Title)
 
 	return &data, nil
 }
@@ -574,6 +574,7 @@ func Scf() (string, error) {
 
 func main() {
 	cloudfunction.Start(Scf)
+	// Scf()
 	// deleteExamID("aa")
 	// addExamID("ssxxx")
 	// Scf()
