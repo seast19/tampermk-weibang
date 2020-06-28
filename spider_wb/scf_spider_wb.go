@@ -148,6 +148,8 @@ func GetDetail(examID string) (*DetailData, error) {
 
 	}
 
+	fmt.Printf("试卷标题 %s", data.Data.Detail.Title)
+
 	return &data, nil
 }
 
@@ -450,7 +452,7 @@ func SubmitQuestions(qList []Question, detail DetailData) {
 			tempQList = qList
 		}
 
-		fmt.Printf("[分次查询] 本次上传题目 %d 个\n", len(tempQList))
+		fmt.Printf("[分次上传] 本次上传题目 %d 个\n", len(tempQList))
 
 		// 构建body
 		bodys := []UploadDataBody{}
@@ -501,7 +503,7 @@ func SubmitQuestions(qList []Question, detail DetailData) {
 			return
 		}
 
-		fmt.Println("[分次查询] 上传题目成功")
+		fmt.Println("[分次上传] 上传题目成功")
 
 		// 退出条件
 		if len(qList) > 300 {
@@ -531,6 +533,8 @@ func Scf() (string, error) {
 		fmt.Println(err)
 		return "error #1", err
 	}
+
+	examIDs = randArr(examIDs)
 
 	for _, examID := range examIDs {
 		fmt.Println("***********************")
