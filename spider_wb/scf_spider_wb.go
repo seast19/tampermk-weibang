@@ -41,8 +41,8 @@ type RankData struct {
 
 // *************************
 
-// DataStruct 考试记录数据结构体
-type DataStruct struct {
+// InfoData 考试记录数据结构体
+type InfoData struct {
 	Data struct {
 		QuestionList []Question `json:"questionList"`
 	} `json:"data"`
@@ -97,24 +97,24 @@ func GetExamID() ([]string, error) {
 		End()
 	if errs != nil {
 		fmt.Println(errs)
-		return []string{}, errors.New("发送请求失败")
+		return []string{}, errors.New("GetExamID 发送请求失败")
 	}
 
 	data := ExamID{}
 	err := json.Unmarshal([]byte(body), &data)
 	if err != nil {
-		fmt.Printf("反序列化examid失败 -> %s", err)
+		fmt.Printf("GetExamID 反序列化examid失败 -> %s", err)
 		return []string{}, err
 	}
 
 	// 检查更新时间，一个小时内更新了的话就不操作
 	if time.Now().Unix()-data.UpdateTime < 60*60 {
-		return []string{}, errors.New("最近已更新")
+		return []string{}, errors.New("1小时内已更新，不再更新")
 	}
 
 	fmt.Printf("examids = %s\n", data.ExamIDs)
 
-	return data.ExamIDs, nil
+	return randArr(data.ExamIDs), nil
 }
 
 // GetDetail 获取详细页面信息
@@ -155,25 +155,10 @@ func GetDetail(examID string) (*DetailData, error) {
 
 // 删除数据库中的某个examid
 func deleteExamID(examID string) {
-	data := struct {
-		ExamIDs struct {
-			Op      string   `json:"__op"`
-			Objects []string `json:"objects"`
-		} `json:"exam_ids"`
-	}{
-		ExamIDs: struct {
-			Op      string   `json:"__op"`
-			Objects []string `json:"objects"`
-		}{
-			Op: "Remove",
-			Objects: []string{
-				examID,
-			},
-		},
-	}
+	data := fmt.Sprintf(`{"exam_ids":{"__op":"Remove","objects":["%s"]}}`, examID)
 
 	request := gorequest.New()
-	_, _, errs := request.Put("https://lc-api.seast.net/1.1/classes/wb_examid/5ef4745dbaa3480008004933").
+	_, body, errs := request.Put("https://lc-api.seast.net/1.1/classes/wb_examid/5ef4745dbaa3480008004933").
 		Set("X-LC-Id", "hYVRtO7xCsS9k7ac4o9bfjKn-gzGzoHsz").
 		Set("X-LC-Key", "u8XIvYFinbdemgmcSeFrLf87").
 		Send(data).
@@ -184,30 +169,16 @@ func deleteExamID(examID string) {
 		return
 	}
 
-	fmt.Println("[tools] 删除 examid 完成")
+	fmt.Printf("[tools] 删除 examid -> %s\n", body)
 }
 
 // 添加 examid 到数据库
 func addExamID(examID string) {
-	data := struct {
-		ExamIDs struct {
-			Op      string   `json:"__op"`
-			Objects []string `json:"objects"`
-		} `json:"exam_ids"`
-	}{
-		ExamIDs: struct {
-			Op      string   `json:"__op"`
-			Objects []string `json:"objects"`
-		}{
-			Op: "AddUnique",
-			Objects: []string{
-				examID,
-			},
-		},
-	}
+
+	data := fmt.Sprintf(`{"exam_ids":{"__op":"AddUnique","objects":["%s"]}}`, examID)
 
 	request := gorequest.New()
-	_, _, errs := request.Put("https://lc-api.seast.net/1.1/classes/wb_examid/5ef4745dbaa3480008004933").
+	_, body, errs := request.Put("https://lc-api.seast.net/1.1/classes/wb_examid/5ef4745dbaa3480008004933").
 		Set("X-LC-Id", "hYVRtO7xCsS9k7ac4o9bfjKn-gzGzoHsz").
 		Set("X-LC-Key", "u8XIvYFinbdemgmcSeFrLf87").
 		Send(data).
@@ -218,7 +189,7 @@ func addExamID(examID string) {
 		return
 	}
 
-	fmt.Println("[tools] 添加examid到数据库完毕")
+	fmt.Printf("[tools] 添加 examid 到数据库 -> %s\n", body)
 }
 
 // GetPhones 获取手机号
@@ -259,6 +230,11 @@ func GetPhones(examID string) ([]string, error) {
 	}
 
 	fmt.Printf("有效手机号码 %d 个\n", len(phoneList))
+
+	if len(phoneList) == 0 {
+		return []string{}, errors.New("手机号数目为0")
+	}
+
 	return phoneList, nil
 }
 
@@ -280,7 +256,7 @@ func GetQuesWithAns(phoneList []string) []Question {
 			continue
 		}
 
-		data := DataStruct{}
+		data := InfoData{}
 		err := json.Unmarshal([]byte(body), &data)
 		if err != nil {
 			fmt.Println(err)
@@ -346,8 +322,12 @@ func CheckQuestionsRepeat(qList []Question) []Question {
 	 */
 
 	fmt.Println("<!!> 开始检查数据库是否有重复题目")
-
 	fmt.Printf("原题目共有 %d 题\n", len(qList))
+
+	// 题数为0
+	if len(qList) == 0 {
+		return []Question{}
+	}
 
 	allQuestions := make([]Question, len(qList))
 	copy(allQuestions, qList)
@@ -442,6 +422,12 @@ func CheckQuestionsRepeat(qList []Question) []Question {
 // SubmitQuestions 提交题目
 func SubmitQuestions(qList []Question, detail DetailData) {
 	fmt.Println("<!!> 开始提交题目到数据库")
+	fmt.Printf("原题目共 %d 个 \n", len(qList))
+
+	// 题数为0
+	if len(qList) == 0 {
+		return
+	}
 
 	tempQList := []Question{}
 
@@ -452,7 +438,7 @@ func SubmitQuestions(qList []Question, detail DetailData) {
 			tempQList = qList
 		}
 
-		fmt.Printf("[分次上传] 本次上传题目 %d 个\n", len(tempQList))
+		fmt.Printf("[分次上传] 上传题目 %d 个\n", len(tempQList))
 
 		// 构建body
 		bodys := []UploadDataBody{}
@@ -512,6 +498,8 @@ func SubmitQuestions(qList []Question, detail DetailData) {
 			break
 		}
 	}
+
+	fmt.Println("上传题目完毕")
 }
 
 // 过滤特殊字符
@@ -526,29 +514,29 @@ func filterSymbol(old string) string {
 
 // Scf 入口函数
 func Scf() (string, error) {
-
 	// 获取数据库中的exam id
 	examIDs, err := GetExamID()
 	if err != nil {
 		fmt.Println(err)
-		return "error #1", err
+		return "连接数据库失败", err
 	}
 
-	examIDs = randArr(examIDs)
-
+	// 按examid依次爬取题目
 	for _, examID := range examIDs {
 		fmt.Println("***********************")
 		fmt.Printf("当前执行 %s\n", examID)
 
-		// 根据examid获取详细信息，检查答题是否结束
+		// 根据examid获取试卷详细信息
 		detail, err := GetDetail(examID)
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
+
+		// 检查试卷答题时间是否结束
 		nowTime := time.Now().UnixNano() / 1e6
 		if nowTime < detail.Data.Detail.StartTime || nowTime > detail.Data.Detail.EndTime {
-			fmt.Printf("%s - %s 已超出答题时间，删除examid", detail.Data.Detail.Title, examID)
+			fmt.Printf("%s - %s 已超出答题时间范围，将删除此记录", detail.Data.Detail.Title, examID)
 			deleteExamID(examID)
 			continue
 		}
@@ -560,12 +548,7 @@ func Scf() (string, error) {
 			continue
 		}
 
-		if len(phoneList) == 0 {
-			fmt.Println("电话号码数量为 0 ")
-			continue
-		}
-
-		// 打乱手机号顺序，取前100个足够
+		// 打乱手机号顺序，只取前100个足够
 		phoneList = randArr(phoneList)
 		if len(phoneList) > 100 {
 			phoneList = phoneList[:100]
@@ -591,5 +574,7 @@ func Scf() (string, error) {
 
 func main() {
 	cloudfunction.Start(Scf)
+	// deleteExamID("aa")
+	// addExamID("ssxxx")
 	// Scf()
 }

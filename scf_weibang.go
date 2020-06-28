@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"regexp"
 	"sync"
 
@@ -38,8 +39,11 @@ type Answer struct {
 // SearchQuestions 查找数据库中的题目
 func SearchQuestions(qList []Question) []Answer {
 	fmt.Println("<!!> 开始获取题目")
-
 	fmt.Printf("原题目共有 %d 题\n", len(qList))
+
+	if len(qList) == 0 {
+		return []Answer{}
+	}
 
 	answerList := []Answer{}
 	count := make(chan int, 3)
@@ -59,7 +63,7 @@ func SearchQuestions(qList []Question) []Answer {
 			}()
 
 			// 查询数据库相同的题目
-			query := fmt.Sprintf(`?where={"question":"%s","selects":"%s"}`, qitem.Q, qitem.OptA)
+			query := fmt.Sprintf(`?where={"question":"%s","selects":"%s"}`, url.QueryEscape(qitem.Q), url.QueryEscape(qitem.OptA))
 			request := gorequest.New()
 			_, body, errs := request.Get("https://lc-api.seast.net/1.1/classes/wb_questions"+query).
 				Set("X-LC-Id", "hYVRtO7xCsS9k7ac4o9bfjKn-gzGzoHsz").
@@ -118,6 +122,8 @@ func SearchQuestions(qList []Question) []Answer {
 					Type: data.Results[0].Type,
 				})
 				lock.Unlock()
+			} else {
+				fmt.Printf("未查到 %s \n", qitem.Q)
 			}
 		}(qitem)
 
@@ -135,22 +141,7 @@ func addExamID(examID string) {
 		return
 	}
 
-	data := struct {
-		ExamIDs struct {
-			Op      string   `json:"__op"`
-			Objects []string `json:"objects"`
-		} `json:"exam_ids"`
-	}{
-		ExamIDs: struct {
-			Op      string   `json:"__op"`
-			Objects []string `json:"objects"`
-		}{
-			Op: "AddUnique",
-			Objects: []string{
-				examID,
-			},
-		},
-	}
+	data := fmt.Sprintf(`{"exam_ids":{"__op":"AddUnique","objects":["%s"]}}`, examID)
 
 	request := gorequest.New()
 	_, body, errs := request.Put("https://lc-api.seast.net/1.1/classes/wb_examid/5ef4745dbaa3480008004933").
@@ -159,7 +150,7 @@ func addExamID(examID string) {
 		Send(data).
 		End()
 	if errs != nil {
-		fmt.Printf("getPhone 发送请求错误")
+		fmt.Printf("发送请求错误 %s\n", errs)
 		fmt.Println(errs)
 		return
 	}
@@ -170,6 +161,8 @@ func addExamID(examID string) {
 // Scf 云函数入口
 func Scf(event DefineEvent) ([]Answer, error) {
 	// 初始化题目和答案列表
+
+	fmt.Printf("请求原始内容:\n %+v \n", event)
 
 	requestData := struct {
 		Host string     `json:"host"`
@@ -186,16 +179,7 @@ func Scf(event DefineEvent) ([]Answer, error) {
 
 	questionsList := requestData.Data
 
-	fmt.Println("题目输入:")
-	if len(questionsList) > 0 {
-		for i, v := range questionsList {
-			fmt.Printf("[%d]%s\n", i+1, v.Q)
-		}
-	}
-	fmt.Println("************************")
-
 	// 查询答案
-
 	answerList := SearchQuestions(questionsList)
 
 	// 有查找不到的题目则加入examid
@@ -206,7 +190,7 @@ func Scf(event DefineEvent) ([]Answer, error) {
 			res := r.FindStringSubmatch(requestData.URL)
 
 			if len(res) == 2 {
-				fmt.Printf("添加 examid  %s\n", res[1])
+				fmt.Printf("即将添加 examid  %s\n", res[1])
 				addExamID(res[1])
 			}
 		}

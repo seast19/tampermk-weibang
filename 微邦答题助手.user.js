@@ -2,13 +2,14 @@
 // @name         微邦答题助手
 // @namespace    https://greasyfork.org/zh-CN/users/563657-seast19
 // @description  微邦自动匹配答案脚本，解放你的大脑
-// @version      2.0.0
+// @version      2.0.1
 // @author       seast19
 // @icon         https://s1.ax1x.com/2020/05/18/YWucdO.png
 // @match        https://weibang.youth.cn/webpage_sapi/examination/detail/*/showDetail/0/phone/platform/*/orgId/httphost/httpport/token
 // @match        https://www.nnjjtgs.com/user/nnjexamExercises/paper.html?testactivityId=*
 // @match        https://www.nnjjtgs.com/user/nnjexam/paper.html?tpid=*
 // @grant        GM_xmlhttpRequest
+// @grant        GM_addStyle
 
 // ==/UserScript==
 ;(function () {
@@ -16,6 +17,12 @@
 
   // ****************全局变量****************************
 
+  // 自定义css
+  const cusCSS = `
+  #alterDoubleButton {
+    display:none !important;
+  }
+  `
   // 云函数api
   const serverAPI =
     // 'https://service-l6svgo68-1254302252.gz.apigw.tencentcs.com/release/weibang_ans_v2'
@@ -37,7 +44,7 @@
   // 过滤特殊字符串
   function filteSpecialSymbol(oldS) {
     let newS = oldS.replace(//g, '')
-    newS = newS.replace(/ /g, '')   
+    newS = newS.replace(/ /g, '')
     newS = newS.replace(/[\n\r]/g, '')
     return newS
   }
@@ -79,7 +86,7 @@
         'X-LC-Key': 'u8XIvYFinbdemgmcSeFrLf87',
         'Content-Type': 'application/json',
       },
-      url: 'https://lc-api.seast.net' + '/1.1/classes/wb_feedback',
+      url: 'https://lc-api.seast.net/1.1/classes/wb_feedback',
       data: JSON.stringify({
         src: window.location.href || '',
         msg: e.msg || '',
@@ -124,8 +131,7 @@
 
   // 通用从服务器获取答案
   function getAnswers() {
-    return new Promise((resolve, reject) => {   
-
+    return new Promise((resolve, reject) => {
       //跨域请求
       GM_xmlhttpRequest({
         method: 'post',
@@ -184,41 +190,38 @@
         for (const answer of answerList) {
           //获取该题目答案
           if (filteSpecialSymbol(answer.q) === question) {
-            // 过滤答案中的重复部分
-            let noRepeatAns = filteRepeatArray(answer.a)
+            let match = false
 
-            //遍历服务器正确答案，找到页面上匹配的选项，依次选择
-            for (const ans of noRepeatAns) {
-              let match = false
+            //   遍历网页中的答案选项
+            for (const ansNode of obj.NodeAnsFather(subNode)) {
+              //如果答案在服务器答案数组中
+              if (answer.a.indexOf(obj.TextOpt(ansNode)) != -1) {
+                match = true
 
-              //遍历网页中的答案选项
-              for (const ansNode of obj.NodeAnsFather(subNode)) {
-                //如果两个答案相同，则点击
-                if (obj.TextOpt(ansNode) === filteSpecialSymbol(ans)) {
-                  match = true
+                obj.ClickNode(ansNode).click()
 
-                  obj.ClickNode(ansNode).click()
-
-                  // 某些多选题 答案选项可能有相同，需要遍历完所有答案，因此无需break
-                  // break
+                if (answer.a.length && answer.a.length === 1) {
+                  break
                 }
               }
+            }
 
-              //答案不匹配则控制台显示答案
-              if (!match) {
-                errorCount += 1
-                console.log(`题目：${question} 无法匹配`)
-                console.log(`答案：${answer.a.join('|')}`)
+            //  答案不匹配则控制台显示答案
+            if (!match) {
+              errorCount += 1
+              console.log(`无法匹配题目：${question} 无法匹配`)
+              console.log(`正确答案：`)
+              console.table(answer.a)
+              // console.log(`正确答案：${answer.a.join('|')}`)
 
-                // 反馈
-                feedBack({
-                  msg: '前端题目不匹配',
-                  q: `${question}`,
-                  a: `${answer.a.join('|')}`,
-                })
+              // 反馈
+              feedBack({
+                msg: '前端题目不匹配',
+                q: `${question}`,
+                a: `${answer.a.join('|')}`,
+              })
 
-                break
-              }
+              break
             }
 
             // 添加此题目到全局题库，下次生成答案时不再匹配此题目
@@ -229,76 +232,16 @@
         }
       }
 
-      showMsgBox(
-        `共匹配 ${answerList.length}/${quesionsList.length} 题，错误 ${errorCount} 题`
-      )
-      resolve()
-    })
-  }
-
-  // 通用控制台显示正确答案
-  function showAnsByCMD(obj) {
-    return new Promise((resolve, reject) => {
-      console.log('*******************')
-
-      showMsgBox(
-        `答案已生成，共[${answerList.length}/${quesionsList.length}]题，请按F12查看`
-      )
-
-      // 便历服务器返回的题目列表
-      for (const answer of answerList) {
-        // 便历网页中的题目以找到匹配的题目
-        for (const subNode of obj.NodeFather()) {
-          // 查找题号
-          let num = obj.TextNum(subNode)
-          let ques = obj.TextQuestion(subNode)
-          // 匹配题目
-          if (ques === filteSpecialSymbol(answer.q)) {
-            let tempAns = ''
-            let ansNodes = obj.NodeAnsFather(subNode)
-            // 反向匹配答案的序号，防止选项与答案不一致
-            for (let i = 0; i < ansNodes.length; i++) {
-              // 当前选项的文本在正确答案中则将其序号记录
-              let ansList = answer.a.map((e) => {
-                return filteSpecialSymbol(e)
-              })
-              if (ansList.indexOf(obj.TextOpt(ansNodes[i])) != -1) {
-                switch (i) {
-                  case 0:
-                    tempAns += 'A'
-                    break
-                  case 1:
-                    tempAns += 'B'
-                    break
-                  case 2:
-                    tempAns += 'C'
-                    break
-                  case 3:
-                    tempAns += 'D'
-                    break
-                  case 4:
-                    tempAns += 'E'
-                    break
-                  case 5:
-                    tempAns += 'F'
-                    break
-
-                  default:
-                    break
-                }
-              }
-            }
-            console.log(
-              `[${tempAns}] [第${num}题] (${answer.a}) --> 题目：${answer.q}`
-            )
-            break
-          }
-        }
-        allList.push(answer.q)
+      // 显示答题结果
+      if (errorCount > 0) {
+        showMsgBox(
+          `共匹配 ${answerList.length} / ${quesionsList.length} 题，其中错误 ${errorCount} 题，请按F2查看详细信息`
+        )
+      } else {
+        showMsgBox(
+          `共匹配 ${answerList.length} / ${quesionsList.length} 题`
+        )
       }
-
-      console.log('*******************')
-
       resolve()
     })
   }
@@ -322,9 +265,6 @@
       .then(() => {
         // 选择正确答案
         return chooseAns(obj)
-
-        // 控制台显示答案
-        // return showAnsByCMD(obj)
       })
       .then(() => {
         startFlag = false
@@ -428,6 +368,9 @@
   // *********************初始化***********************
 
   function init() {
+    // 屏蔽下载弹窗
+    GM_addStyle(cusCSS)
+
     //侧边按钮
     let btnBox = document.createElement('div')
     btnBox.id = 'wk_btn'
