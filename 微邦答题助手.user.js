@@ -2,7 +2,7 @@
 // @name         微邦答题助手
 // @namespace    https://greasyfork.org/zh-CN/users/563657-seast19
 // @description  微邦自动匹配答案脚本，解放你的大脑
-// @version      2.0.1
+// @version      2.0.2
 // @author       seast19
 // @icon         https://s1.ax1x.com/2020/05/18/YWucdO.png
 // @match        http*://weibang.youth.cn/webpage_sapi/examination/detail/*/showDetail/0/phone/platform/*/orgId/httphost/httpport/token
