@@ -5,7 +5,7 @@
 // @version      2.0.1
 // @author       seast19
 // @icon         https://s1.ax1x.com/2020/05/18/YWucdO.png
-// @match        https://weibang.youth.cn/webpage_sapi/examination/detail/*/showDetail/0/phone/platform/*/orgId/httphost/httpport/token
+// @match        http*://weibang.youth.cn/webpage_sapi/examination/detail/*/showDetail/0/phone/platform/*/orgId/httphost/httpport/token
 // @match        https://www.nnjjtgs.com/user/nnjexamExercises/paper.html?testactivityId=*
 // @match        https://www.nnjjtgs.com/user/nnjexam/paper.html?tpid=*
 // @grant        GM_xmlhttpRequest
