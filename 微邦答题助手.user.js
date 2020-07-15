@@ -37,7 +37,98 @@
   // 运行标志
   let startFlag = false
 
-  // *****************公共函数*****************************
+  // 微邦模型
+  let objWB = {
+    Title() {
+      return document.querySelector('.title_pageDetail').innerText
+    },
+    // 题目div的父节点 应返回题目div（包含题目选项等信息）的列表
+    // return []subNode
+    NodeFather() {
+      return document.querySelectorAll('.questionListWrapper_content')
+    },
+    // 题目
+    TextQuestion(subNode) {
+      let ques = subNode.querySelector('.titleText_content').childNodes[1]
+        .nodeValue
+      // 特殊字符处理
+      ques = filteSpecialSymbol(ques)
+      return ques
+    },
+    // 题号
+    TextNum(subNode) {
+      let num = subNode.querySelector('span').innerText
+      return num
+    },
+    // 选项A内容
+    TextOptionA(subNode) {
+      let optText = subNode.querySelector('label.optionContent_content')
+        .innerText
+      // 特殊字符处理
+      optText = filteSpecialSymbol(optText)
+      return optText
+    },
+    // 选项div 的父节点
+    // return []ansNode
+    NodeAnsFather(subNode) {
+      return subNode.querySelectorAll('label.optionContent_content')
+    },
+    // 任意选项内容
+    TextOpt(ansNode) {
+      let optText = ansNode.innerText
+      optText = filteSpecialSymbol(optText)
+      return optText
+    },
+    // 点击的节点
+    ClickNode(ansNode) {
+      return ansNode
+    },
+  }
+
+  // 众学网模型
+  let objZXW = {
+    // 父节点
+    NodeFather: function () {
+      return document.querySelectorAll('li.topic')
+    },
+    // 问题题目
+    TextQuestion: function (subNode) {
+      let ques = subNode.querySelector('dt>div').innerText
+      // 特殊字符处理
+      ques = filteSpecialSymbol(ques)
+      return ques
+    },
+    // 题号
+    TextNum: function (subNode) {
+      let num = subNode.getAttribute('index')
+      return num
+    },
+    // 选项A
+    TextOptionA: function (subNode) {
+      let optText = subNode.querySelector('dd').innerText
+      // 特殊字符处理
+      optText = optText.substring(2) //过滤选项前面的A
+      optText = filteSpecialSymbol(optText)
+      return optText
+    },
+    // 选项 父节点
+    NodeAnsFather: function (subNode) {
+      return subNode.querySelectorAll('dd')
+    },
+    // 任意选项
+    TextOpt: function (ansNode) {
+      let optText = ansNode.innerText
+      optText = optText.substring(2)
+      optText = filteSpecialSymbol(optText)
+      return optText
+    },
+    //点击的节点
+    ClickNode: function (ansNode) {
+      return ansNode.querySelector('label')
+    },
+  }
+
+  // *****************工具函数*****************************
 
   //全局添加样式
   function addGlobalStyle(css) {
@@ -108,6 +199,8 @@
     })
   }
 
+  // ****************爬虫函数****************
+
   // 通用获取问题
   function getQuestions(obj) {
     return new Promise((resolve, reject) => {
@@ -159,7 +252,7 @@
 
           if (answerList.length == undefined) {
             reject('获取题目失败')
-            return
+            
           }
 
           console.log(
@@ -185,80 +278,76 @@
 
   // 通用页面上选择正确答案
   function chooseAns(obj) {
-    return new Promise((resolve, reject) => {
-      // 错误题数
-      let errorCount = 0
+    // 错误题数
+    let errorCount = 0
 
-      //遍历网页题目
-      for (const subNode of obj.NodeFather()) {
-        //获取本题目
-        let question = obj.TextQuestion(subNode)
+    //遍历网页题目
+    for (const subNode of obj.NodeFather()) {
+      //获取本题目
+      let question = obj.TextQuestion(subNode)
 
-        //全局题目中有记录，则代表此题已经匹配
-        if (allList.indexOf(question) != -1) {
-          continue
-        }
+      //全局题目中有记录，则代表此题已经匹配
+      if (allList.indexOf(question) != -1) {
+        continue
+      }
 
-        //遍历服务器题目，找到网页与服务器匹配题目
-        for (const answer of answerList) {
-          //获取该题目答案
-          if (filteSpecialSymbol(answer.q) === question) {
-            let match = false
+      //遍历服务器题目，找到网页与服务器匹配题目
+      for (const answer of answerList) {
+        //获取该题目答案
+        if (filteSpecialSymbol(answer.q) === question) {
+          let match = false
 
-            //   遍历网页中的答案选项
-            for (const ansNode of obj.NodeAnsFather(subNode)) {
-              //如果答案在服务器答案数组中
-              if (answer.a.indexOf(obj.TextOpt(ansNode)) != -1) {
-                match = true
+          //   遍历网页中的答案选项
+          for (const ansNode of obj.NodeAnsFather(subNode)) {
+            //如果答案在服务器答案数组中
+            if (answer.a.indexOf(obj.TextOpt(ansNode)) != -1) {
+              match = true
 
-                obj.ClickNode(ansNode).click()
+              obj.ClickNode(ansNode).click()
 
-                if (answer.a.length && answer.a.length === 1) {
-                  break
-                }
+              if (answer.a.length && answer.a.length === 1) {
+                break
               }
             }
+          }
 
-            //  答案不匹配则控制台显示答案
-            if (!match) {
-              errorCount += 1
-              console.log(`无法匹配题目：${question} 无法匹配`)
-              console.log(`正确答案：`)
-              console.table(answer.a)
-              // console.log(`正确答案：${answer.a.join('|')}`)
+          //  答案不匹配则控制台显示答案
+          if (!match) {
+            errorCount += 1
+            console.log(`无法匹配题目：${question} 无法匹配`)
+            console.log(`正确答案：`)
+            console.table(answer.a)
 
-              // 反馈
-              feedBack({
-                msg: '前端题目不匹配',
-                q: `${question}`,
-                a: `${answer.a.join('|')}`,
-              })
-
-              break
-            }
-
-            // 添加此题目到全局题库，下次生成答案时不再匹配此题目
-            allList.push(question)
+            // 反馈
+            feedBack({
+              msg: '前端题目不匹配',
+              q: `${question}`,
+              a: `${answer.a.join('|')}`,
+            })
 
             break
           }
+
+          // 添加此题目到全局题库，下次生成答案时不再匹配此题目
+          allList.push(question)
+
+          break
         }
       }
+    }
 
-      // 显示答题结果
-      if (errorCount > 0) {
-        showMsgBox(
-          `共匹配 ${answerList.length} / ${quesionsList.length} 题，其中错误 ${errorCount} 题，请按F2查看详细信息`
-        )
-      } else {
-        showMsgBox(`共匹配 ${answerList.length} / ${quesionsList.length} 题`)
-      }
-      resolve()
-    })
+    // 显示答题结果
+    if (errorCount > 0) {
+      showMsgBox(
+        `共匹配 ${answerList.length} / ${quesionsList.length} 题，其中错误 ${errorCount} 题，请按F2查看详细信息`
+      )
+    } else {
+      showMsgBox(`共匹配 ${answerList.length} / ${quesionsList.length} 题`)
+    }
   }
 
   // 开始函数
-  function start(obj) {
+  async function start() {
     // 防止多次点击
     if (startFlag === true) {
       console.log('点击频繁')
@@ -267,120 +356,38 @@
 
     startFlag = true
 
-    // 获取题目
-    getQuestions(obj)
-      .then(() => {
-        // 获取答案
-        return getAnswers(obj)
-      })
-      .then(() => {
-        // 选择正确答案
-        return chooseAns(obj)
-      })
-      .then(() => {
-        startFlag = false
-      })
-      .catch((e) => {
-        showMsgBox(e)
-        startFlag = false
-      })
-  }
+    // 分选答题平台
+    let obj = ''
+    switch (window.location.host) {
+      case 'weibang.youth.cn': // 微邦
+        obj = objWB
+        break
 
-  // *********************微邦*********************
+      case 'www.nnjjtgs.com': // 众学网
+        obj = objZXW
+        break
 
-  let objWB = {
-    Title: function () {
-      return document.querySelector('.title_pageDetail').innerText
-    },
-    // 题目div的父节点 应返回题目div（包含题目选项等信息）的列表
-    // return []subNode
-    NodeFather: function () {
-      return document.querySelectorAll('.questionListWrapper_content')
-    },
-    // 题目
-    TextQuestion: function (subNode) {
-      let ques = subNode.querySelector('.titleText_content').childNodes[1]
-        .nodeValue
-      // 特殊字符处理
-      ques = filteSpecialSymbol(ques)
-      return ques
-    },
-    // 题号
-    TextNum: function (subNode) {
-      let num = subNode.querySelector('span').innerText
-      return num
-    },
-    // 选项A内容
-    TextOptionA: function (subNode) {
-      let optText = subNode.querySelector('label.optionContent_content')
-        .innerText
-      // 特殊字符处理
-      optText = filteSpecialSymbol(optText)
-      return optText
-    },
-    // 选项div 的父节点
-    // return []ansNode
-    NodeAnsFather: function (subNode) {
-      return subNode.querySelectorAll('label.optionContent_content')
-    },
-    // 任意选项内容
-    TextOpt: function (ansNode) {
-      let optText = ansNode.innerText
-      optText = filteSpecialSymbol(optText)
-      return optText
-    },
-    // 点击的节点
-    ClickNode: function (ansNode) {
-      return ansNode
-    },
-  }
+      default:
+        alert('当前页面暂不支持自动答题')
+        return
+    }
 
-  // ************众学网*********************
+    // 开始答题
+    try {
+      await getQuestions(obj)
+      await getAnswers(obj)
+      chooseAns(obj)
+    } catch (e) {
+      console.log(e)
+      showMsgBox(e)
+    }
 
-  let objZXW = {
-    // 父节点
-    NodeFather: function () {
-      return document.querySelectorAll('li.topic')
-    },
-    // 问题题目
-    TextQuestion: function (subNode) {
-      let ques = subNode.querySelector('dt>div').innerText
-      // 特殊字符处理
-      ques = filteSpecialSymbol(ques)
-      return ques
-    },
-    // 题号
-    TextNum: function (subNode) {
-      let num = subNode.getAttribute('index')
-      return num
-    },
-    // 选项A
-    TextOptionA: function (subNode) {
-      let optText = subNode.querySelector('dd').innerText
-      // 特殊字符处理
-      optText = optText.substring(2) //过滤选项前面的A
-      optText = filteSpecialSymbol(optText)
-      return optText
-    },
-    // 选项 父节点
-    NodeAnsFather: function (subNode) {
-      return subNode.querySelectorAll('dd')
-    },
-    // 任意选项
-    TextOpt: function (ansNode) {
-      let optText = ansNode.innerText
-      optText = optText.substring(2)
-      optText = filteSpecialSymbol(optText)
-      return optText
-    },
-    //点击的节点
-    ClickNode: function (ansNode) {
-      return ansNode.querySelector('label')
-    },
+    startFlag = false
   }
 
   // *********************初始化***********************
 
+  // 初始化函数
   function init() {
     // 屏蔽下载弹窗
     try {
@@ -403,24 +410,11 @@
       'display:none;z-index:999;position:fixed; left:10%;bottom:10%;width:80%; border-radius: 3px;padding-left: 6px;padding-right: 6px; height:30px;line-height:30px; background-color:#6b6b6b;box-shadow: 6px 6px 4px #e0e0e0;color:#fff;text-align:center;font-size:16px;font-family:"Microsoft YaHei","微软雅黑",STXihei,"华文细黑",Georgia,"Times New Roman",Arial,sans-serif;font-weight:bold;cursor:pointer'
     msgBox.innerHTML = 'this is dafault msg'
 
+    // 事件注入
     document.querySelector('body').append(btnBox)
     document.querySelector('body').append(msgBox)
-
-    document.getElementById('wk_btn').addEventListener('click', () => {
-      // 分选答题平台
-      switch (window.location.host) {
-        case 'weibang.youth.cn': // 微邦
-          start(objWB)
-          break
-
-        case 'www.nnjjtgs.com': // 众学网
-          start(objZXW)
-          break
-
-        default:
-          alert('当前页面暂不支持自动答题')
-          break
-      }
+    document.getElementById('wk_btn').addEventListener('click', async () => {
+      await start()
     })
   }
 
