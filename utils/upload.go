@@ -3,10 +3,14 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	"github.com/360EntSecGroup-Skylar/excelize"
 	"github.com/parnurzeal/gorequest"
-	"strings"
 )
+
+// 题库文件名 （仅支持xlsx文件，按照模板填写数据）
+const filename = "./template.xlsx"
 
 // 过滤特殊字符
 func filterSymbol(old string) string {
@@ -21,7 +25,7 @@ func filterSymbol(old string) string {
 // 手动上传题库到learncloud
 func Upload() {
 	//读取文件
-	f, err := excelize.OpenFile("./q.xlsx")
+	f, err := excelize.OpenFile(filename)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -55,7 +59,7 @@ func Upload() {
 		}
 
 		if len(resSearch.Results) > 0 {
-			fmt.Printf("题目重复 %d",rowIndex)
+			fmt.Printf("题目重复 %d", rowIndex)
 			continue
 		}
 
@@ -106,9 +110,7 @@ func Upload() {
 			continue
 		}
 
-		fmt.Printf("添加成功 %d\n",rowIndex)
-
-
+		fmt.Printf("添加成功 %d\n", rowIndex)
 
 	}
 
