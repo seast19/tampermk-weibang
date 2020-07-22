@@ -2,12 +2,12 @@
 // @name         微邦答题助手
 // @namespace    https://greasyfork.org/zh-CN/users/563657-seast19
 // @description  微邦自动匹配答案脚本，解放你的大脑
-// @version      2.0.3
+// @version      2.0.4
 // @author       seast19
 // @icon         https://s1.ax1x.com/2020/05/18/YWucdO.png
 // @match        http*://weibang.youth.cn/webpage_sapi/examination/detail/*/showDetail/0/phone/platform/*/orgId/httphost/httpport/token
-// @match        https://www.nnjjtgs.com/user/nnjexamExercises/paper.html?testactivityId=*
-// @match        https://www.nnjjtgs.com/user/nnjexam/paper.html?tpid=*
+// @nomatch        https://www.nnjjtgs.com/user/nnjexamExercises/paper.html?testactivityId=*
+// @nomatch        https://www.nnjjtgs.com/user/nnjexam/paper.html?tpid=*
 // @grant        GM_xmlhttpRequest
 
 // ==/UserScript==
@@ -31,11 +31,9 @@
   let answerList = [] //服务器返回的答案
   let allList = [] //全局已经答过的题目
 
-  //全局计时器
-  let globalTimeout
-
-  // 运行标志
-  let startFlag = false
+  let globalTimeout //全局计时器
+  let startFlag = false // 运行标志
+  let feedBackFlag = false //反馈标记
 
   // 微邦模型
   let objWB = {
@@ -182,6 +180,12 @@
 
   //错误日搜集
   function feedBack(e) {
+    if (feedBackFlag) {
+      return
+    }
+
+    feedBackFlag = true
+
     GM_xmlhttpRequest({
       method: 'post',
       headers: {
@@ -191,6 +195,7 @@
       },
       url: 'https://lc-api.seast.net/1.1/classes/wb_feedback',
       data: JSON.stringify({
+        title: objWB.Title() || '',
         src: window.location.href || '',
         msg: e.msg || '',
         question: e.q || '',
@@ -252,7 +257,6 @@
 
           if (answerList.length == undefined) {
             reject('获取题目失败')
-            
           }
 
           console.log(
