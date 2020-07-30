@@ -179,7 +179,7 @@
   }
 
   //错误日搜集
-  function feedBack(e) {
+  function feedBack(e,obj) {
     if (feedBackFlag) {
       return
     }
@@ -195,7 +195,7 @@
       },
       url: 'https://lc-api.seast.net/1.1/classes/wb_feedback',
       data: JSON.stringify({
-        title: objWB.Title() || '',
+        title: obj.Title() || '',
         src: window.location.href || '',
         msg: e.msg || '',
         question: e.q || '',
@@ -267,7 +267,7 @@
           if (answerList.length != quesionsList.length) {
             feedBack({
               msg: '后台与前端题目数不匹配',
-            })
+            },obj)
           }
 
           resolve()
@@ -327,7 +327,7 @@
               msg: '前端题目不匹配',
               q: `${question}`,
               a: `${answer.a.join('|')}`,
-            })
+            },obj)
 
             break
           }
