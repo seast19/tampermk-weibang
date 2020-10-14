@@ -5,6 +5,8 @@
 // @version      2.0.4
 // @author       seast19
 // @icon         https://s1.ax1x.com/2020/05/18/YWucdO.png
+// @require      https://cdn.bootcdn.net/ajax/libs/jquery/3.5.1/jquery.min.js
+// @require      https://cdn.bootcdn.net/ajax/libs/layer/3.1.1/layer.min.js
 // @match        http*://weibang.youth.cn/webpage_sapi/examination/detail/*/showDetail/0/phone/platform/*/orgId/httphost/httpport/token
 // @nomatch        https://www.nnjjtgs.com/user/nnjexamExercises/paper.html?testactivityId=*
 // @nomatch        https://www.nnjjtgs.com/user/nnjexam/paper.html?tpid=*
@@ -13,8 +15,11 @@
 // ==/UserScript==
 ;(function () {
   'use strict'
-
+  https://weibang.youth.cn/webpage_sapi/examination/detail/zlwz7iATAHAdcwrt/showDetail/0/phone/platform/45c01a/orgId/httphost/httpport/token
   // ****************全局变量****************************
+  // $(document.body).append(`<link href="https://cdn.bootcdn.net/ajax/libs/layer/3.1.1/theme/default/layer.min.css" rel="stylesheet">`)
+
+  layer.alert('内容')
 
   // 自定义css
   const cusCSS = `
