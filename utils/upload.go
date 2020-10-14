@@ -10,7 +10,7 @@ import (
 )
 
 // 题库文件名 （仅支持xlsx文件，按照模板填写数据）
-const filename = "./template.xlsx"
+const filename = "./8月规章学习考试题.xlsx"
 
 // 过滤特殊字符
 func filterSymbol(old string) string {
@@ -59,7 +59,7 @@ func Upload() {
 		}
 
 		if len(resSearch.Results) > 0 {
-			fmt.Printf("题目重复 %d", rowIndex)
+			fmt.Printf("题目重复 %d\n", rowIndex)
 			continue
 		}
 
