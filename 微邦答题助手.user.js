@@ -2,11 +2,10 @@
 // @name         微邦答题助手
 // @namespace    https://greasyfork.org/zh-CN/users/563657-seast19
 // @description  微邦自动匹配答案脚本，解放你的大脑
-// @version      2.0.4
+// @version      2.0.5
 // @author       seast19
 // @icon         https://s1.ax1x.com/2020/05/18/YWucdO.png
-// @require      https://cdn.bootcdn.net/ajax/libs/jquery/3.5.1/jquery.min.js
-// @require      https://cdn.bootcdn.net/ajax/libs/layer/3.1.1/layer.min.js
+// @require      https://cdn.staticfile.org/layer/3.1.1/mobile/layer.min.js
 // @match        http*://weibang.youth.cn/webpage_sapi/examination/detail/*/showDetail/0/phone/platform/*/orgId/httphost/httpport/token
 // @nomatch        https://www.nnjjtgs.com/user/nnjexamExercises/paper.html?testactivityId=*
 // @nomatch        https://www.nnjjtgs.com/user/nnjexam/paper.html?tpid=*
@@ -15,17 +14,21 @@
 // ==/UserScript==
 ;(function () {
   'use strict'
-  https://weibang.youth.cn/webpage_sapi/examination/detail/zlwz7iATAHAdcwrt/showDetail/0/phone/platform/45c01a/orgId/httphost/httpport/token
-  // ****************全局变量****************************
-  // $(document.body).append(`<link href="https://cdn.bootcdn.net/ajax/libs/layer/3.1.1/theme/default/layer.min.css" rel="stylesheet">`)
 
-  layer.alert('内容')
+  // 加载layer css
+  let link = document.createElement('link')
+  link.rel = 'stylesheet'
+  link.type = 'text/css'
+  link.href = 'https://cdn.staticfile.org/layer/3.1.1/mobile/need/layer.min.css'
+  document.head.appendChild(link)
+
+  // ****************全局变量****************************
 
   // 自定义css
   const cusCSS = `
   #alterDoubleButton {
     display:none !important;
-  }
+  } 
   `
   // 云函数api
   const serverAPI =
@@ -36,7 +39,7 @@
   let answerList = [] //服务器返回的答案
   let allList = [] //全局已经答过的题目
 
-  let globalTimeout //全局计时器
+  // let globalTimeout //全局计时器
   let startFlag = false // 运行标志
   let feedBackFlag = false //反馈标记
 
@@ -46,7 +49,6 @@
       return document.querySelector('.title_pageDetail').innerText
     },
     // 题目div的父节点 应返回题目div（包含题目选项等信息）的列表
-    // return []subNode
     NodeFather() {
       return document.querySelectorAll('.questionListWrapper_content')
     },
@@ -131,7 +133,7 @@
     },
   }
 
-  // *****************工具函数*****************************
+  // *****************工具函数***************************** //
 
   //全局添加样式
   function addGlobalStyle(css) {
@@ -141,7 +143,6 @@
       return
     }
     style = document.createElement('style')
-    style.type = 'text/css'
     css = css.replace('!important', '')
     style.innerHTML = css.replace(/;/g, ' !important;')
     head.appendChild(style)
@@ -155,36 +156,8 @@
     return newS
   }
 
-  // 去除重复数组
-  function filteRepeatArray(arr) {
-    for (let i = 0; i < arr.length - 1; i++) {
-      //遍历获取“前一个元素”，最后一个数不用获取，它本身已经被前面所有元素给排除过了
-      for (let j = i + 1; j < arr.length; j++) {
-        //遍历获取剩下的元素，“后一个元素”的起始索引就是“前一个元素”的索引+1
-        if (arr[i] == arr[j]) {
-          //如果“前一个元素”与后面剩下的元素之一相同，那么就要删除后面的这个元素
-          arr.splice(j, 1)
-          j-- //如果删除了这个元素，那么后面的元素索引值就会发生改变，所以这里的j需要-1
-        }
-      }
-    }
-    return arr
-  }
-
-  // 显示信息框
-  function showMsgBox(text) {
-    //避免调用频繁导致上一次的隐藏消息框影响到本次显示
-    clearTimeout(globalTimeout)
-
-    document.getElementById('wk_msg').innerText = text
-    document.getElementById('wk_msg').style.display = 'block'
-    globalTimeout = setTimeout(() => {
-      document.getElementById('wk_msg').style.display = 'none'
-    }, 6000)
-  }
-
   //错误日搜集
-  function feedBack(e,obj) {
+  function feedBack(e, obj) {
     if (feedBackFlag) {
       return
     }
@@ -209,13 +182,11 @@
     })
   }
 
-  // ****************爬虫函数****************
+  // ****************爬虫函数**************** //
 
   // 通用获取问题
   function getQuestions(obj) {
     return new Promise((resolve, reject) => {
-      showMsgBox('生成答案中..')
-
       //清空之前的数据
       quesionsList = []
       answerList = []
@@ -226,7 +197,7 @@
         let tempQues = obj.TextQuestion(subNode)
         let tempOptA = obj.TextOptionA(subNode)
 
-        // 若已经有答题记录，则不再重新获取答案
+        // 添加未答过的题目
         if (allList.indexOf(tempQues) === -1) {
           quesionsList.push({
             q: tempQues,
@@ -251,6 +222,7 @@
       GM_xmlhttpRequest({
         method: 'post',
         url: serverAPI,
+        timeout: 20000,
         data: JSON.stringify({
           title: obj.Title(),
           host: window.location.host,
@@ -259,7 +231,6 @@
         }),
         onload: function (res) {
           answerList = JSON.parse(res.responseText)
-
           if (answerList.length == undefined) {
             reject('获取题目失败')
           }
@@ -270,12 +241,19 @@
 
           // 反馈
           if (answerList.length != quesionsList.length) {
-            feedBack({
-              msg: '后台与前端题目数不匹配',
-            },obj)
+            feedBack(
+              {
+                msg: `后台与前端(${answerList.length}/${quesionsList.length})题目数不匹配`,
+              },
+              obj
+            )
           }
 
           resolve()
+        },
+        ontimeout: function (e) {
+          console.log(e)
+          reject('后台服务器连接超时')
         },
         onerror: function (e) {
           console.log(e)
@@ -326,14 +304,15 @@
             console.log(`无法匹配题目：${question} 无法匹配`)
             console.log(`正确答案：`)
             console.table(answer.a)
-
             // 反馈
-            feedBack({
-              msg: '前端题目不匹配',
-              q: `${question}`,
-              a: `${answer.a.join('|')}`,
-            },obj)
-
+            feedBack(
+              {
+                msg: '前端题目不匹配',
+                q: `${question}`,
+                a: `${answer.a.join('|')}`,
+              },
+              obj
+            )
             break
           }
 
@@ -347,11 +326,17 @@
 
     // 显示答题结果
     if (errorCount > 0) {
-      showMsgBox(
-        `共匹配 ${answerList.length} / ${quesionsList.length} 题，其中错误 ${errorCount} 题，请按F2查看详细信息`
-      )
+      layer.open({
+        content: `共匹配 ${answerList.length} / ${quesionsList.length} 题，其中错误 ${errorCount} 题，请按F2查看详细信息`,
+        skin: 'msg',
+        time: 3, //2秒后自动关闭
+      })
     } else {
-      showMsgBox(`共匹配 ${answerList.length} / ${quesionsList.length} 题`)
+      layer.open({
+        content: `共匹配 ${answerList.length} / ${quesionsList.length} 题`,
+        skin: 'msg',
+        time: 3, //2秒后自动关闭
+      })
     }
   }
 
@@ -384,11 +369,20 @@
     // 开始答题
     try {
       await getQuestions(obj)
+      layer.open({
+        content: '开始答题..',
+        skin: 'msg',
+        time: 30, //2秒后自动关闭
+      })
       await getAnswers(obj)
       chooseAns(obj)
     } catch (e) {
       console.log(e)
-      showMsgBox(e)
+      layer.open({
+        content: e,
+        skin: 'msg',
+        time: 3, //2秒后自动关闭
+      })
     }
 
     startFlag = false
@@ -402,8 +396,15 @@
     try {
       addGlobalStyle(cusCSS)
     } catch (e) {
-      console.log('无法加载自定义样式')
+      console.log('[weibang_helper]无法加载自定义样式')
     }
+
+    // 加载layer css
+    let link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.type = 'text/css'
+    link.href =
+      'https://cdn.staticfile.org/layer/3.1.1/mobile/need/layer.min.css'
 
     //侧边按钮
     let btnBox = document.createElement('div')
@@ -412,16 +413,9 @@
       'display:block;z-index:999;position:fixed; right:10px;top:45%; width:70px; height:30px;line-height:30px; background-color:#f50;color:#fff;text-align:center;font-size:16px;font-family:"Microsoft YaHei","微软雅黑",STXihei,"华文细黑",Georgia,"Times New Roman",Arial,sans-serif;font-weight:bold;cursor:pointer'
     btnBox.innerHTML = '生成答案'
 
-    // 消息提示框
-    let msgBox = document.createElement('div')
-    msgBox.id = 'wk_msg'
-    msgBox.style =
-      'display:none;z-index:999;position:fixed; left:10%;bottom:10%;width:80%; border-radius: 3px;padding-left: 6px;padding-right: 6px; height:30px;line-height:30px; background-color:#6b6b6b;box-shadow: 6px 6px 4px #e0e0e0;color:#fff;text-align:center;font-size:16px;font-family:"Microsoft YaHei","微软雅黑",STXihei,"华文细黑",Georgia,"Times New Roman",Arial,sans-serif;font-weight:bold;cursor:pointer'
-    msgBox.innerHTML = 'this is dafault msg'
-
     // 事件注入
+    document.head.appendChild(link)
     document.querySelector('body').append(btnBox)
-    document.querySelector('body').append(msgBox)
     document.getElementById('wk_btn').addEventListener('click', async () => {
       await start()
     })
