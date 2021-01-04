@@ -363,7 +363,7 @@ func CheckQuestionsRepeat(qList []Question) []Question {
 		// 查询数据库相同的题目（使用qid查询）
 		query := fmt.Sprintf(`?keys=qid&where={"qid":{"$in":%s}}`, string(idListStr))
 		request := gorequest.New()
-		_, body, errs := request.Get("https://lc-api.seast.net/1.1/classes/wb_questions"+query).
+		_, body, errs := request.Get("https://lc-api.seast.net/1.1/classes/wb_questions").
 			Set("X-LC-Id", "hYVRtO7xCsS9k7ac4o9bfjKn-gzGzoHsz").
 			Set("X-LC-Key", "u8XIvYFinbdemgmcSeFrLf87").
 			End()
